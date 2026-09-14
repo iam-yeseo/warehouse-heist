@@ -2,13 +2,23 @@
 <html lang="ko">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#07152c" />
     <meta name="description" content="도둑을 추격해 창고에서 사라진 상품 3개를 되찾는 8비트 횡스크롤 게임" />
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%2307152c'/%3E%3Cpath d='M9 27h31v22H9z' fill='white' stroke='%230a1830' stroke-width='4'/%3E%3Cpath d='M40 33h12l5 7v9H40z' fill='white' stroke='%230a1830' stroke-width='4'/%3E%3Cpath d='M10 42h46' stroke='%23f27490' stroke-width='4'/%3E%3Ccircle cx='21' cy='51' r='6' fill='%2329dff2' stroke='%230a1830' stroke-width='4'/%3E%3Ccircle cx='47' cy='51' r='6' fill='%2329dff2' stroke='%230a1830' stroke-width='4'/%3E%3C/svg%3E" />
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="ko_KR" />
+    <meta property="og:title" content="창고 탈환 작전" />
+    <meta property="og:description" content="점프하고 부스트! 도둑을 추격하고 촬영 장비 3개를 되찾으세요." />
+    <meta property="og:url" content="https://heist.yeseo.im/" />
+    <meta property="og:image" content="https://heist.yeseo.im/assets/share.jpg?v=1.5.0" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="창고 탈환 작전의 도심 추격" />
+    <meta name="twitter:card" content="summary_large_image" />
     <title>창고 탈환 작전</title>
-    <link rel="preload" href="./assets/game/fonts/DOSGothic.ttf" as="font" type="font/ttf" crossorigin />
-    <link rel="stylesheet" href="./style.css?v=1.4.0" />
+    <link rel="preload" href="./assets/game/fonts/DOSGothic.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="./style.css?v=1.5.0" />
   </head>
   <body>
     <main class="game-app">
@@ -31,23 +41,23 @@
           <div class="hud-right">
             <div class="product-slots" id="productSlots" aria-label="회수한 제품"></div>
             <div class="boost-status" id="boostStatus">
-              <img id="boostGauge" src="./assets/game/ui/items/boost-gauge-empty.png" alt="부스트 충전 상태" />
+              <img id="boostGauge" src="./assets/game/ui/items/boost-gauge-empty.webp" alt="부스트 충전 상태" />
               <span id="boostLabel">0.0 / 10초</span>
             </div>
+<button class="icon-button pause-button" id="pauseButton" type="button" aria-label="일시정지">
+          <img src="./assets/game/ui/items/button-pause.webp" alt="" />
+        </button>
+<button class="icon-button sound-button" id="soundButton" type="button" aria-label="효과음 끄기" aria-pressed="false">소리 켬</button>
           </div>
         </header>
 
-        <button class="icon-button pause-button" id="pauseButton" type="button" aria-label="일시정지">
-          <img src="./assets/game/ui/items/button-pause.png" alt="" />
-        </button>
-
         <div class="mobile-actions" aria-label="게임 조작">
           <button class="action-button" id="jumpButton" type="button" aria-label="점프, 한 번 더 누르면 더블점프">
-            <img src="./assets/game/ui/items/button-jump.png" alt="" />
+            <img src="./assets/game/ui/items/button-jump.webp" alt="" />
             <span>점프</span>
           </button>
           <button class="action-button" id="boostButton" type="button" aria-label="부스트 사용" disabled>
-            <img src="./assets/game/ui/items/button-boost.png" alt="" />
+            <img src="./assets/game/ui/items/button-boost.webp" alt="" />
             <span>부스트</span>
           </button>
         </div>
@@ -56,6 +66,7 @@
         <div class="screen loading-screen is-visible" id="loadingScreen" aria-live="polite">
           <div class="loading-mark" aria-hidden="true">▰▰▰</div>
           <p>창고 문을 여는 중...</p>
+          <p id="loadingCount">준비 중</p><button id="loadingRetry" class="pixel-button secondary" type="button" hidden>다시 불러오기</button>
           <div class="loading-track"><span id="loadingBar"></span></div>
         </div>
 
@@ -65,6 +76,7 @@
             <p class="eyebrow">WAREHOUSE HEIST</p>
             <h1>창고 탈환<br /><em>작전</em></h1>
             <p>도둑이 훔쳐 간 상품 3개를 되찾으세요.<br />세 개의 도로 끝에 하나씩 숨겨져 있습니다.</p>
+            <p id="recordSummary" class="record-summary"></p>
             <div class="rules">
               <span><b>SPACE</b> 점프 · 더블점프</span>
               <span><b>B</b> 10초 무충돌 부스트</span>
@@ -81,14 +93,15 @@
             <p class="eyebrow">ITEM RECOVERED</p>
             <h2><span id="clearStageLabel">스테이지 1</span> 클리어!</h2>
             <div class="recovery-visual">
-              <img id="recoveryCase" class="recovery-case" src="./assets/game/effects/recovery/case-01.png" alt="열리는 회수 상자" />
-              <img id="recoveredProduct" class="recovered-product" src="" alt="되찾은 상품" />
+              <img id="recoveryCase" class="recovery-case" src="./assets/game/effects/recovery/case-01.webp" alt="열리는 회수 상자" />
+              <a id="productImageLink" target="_blank" rel="noopener noreferrer" aria-label="회수한 상품 보러가기"><img id="recoveredProduct" class="recovered-product" alt="되찾은 상품" /></a>
             </div>
             <h3 class="recovered-product-name" id="recoveredProductName">회수한 상품</h3>
+            <p id="recoveredProductCopy" class="product-copy"></p>
             <strong id="recoveryCount">상품 회수 1 / 3</strong>
             <div class="recovery-actions">
-              <a class="pixel-button product-link" id="productLink" href="#" target="_blank" rel="noopener noreferrer">상품 보러가기 ↗</a>
-              <button class="pixel-button primary" id="nextStageButton" type="button">다음 추격</button>
+              <a class="pixel-button primary product-link" id="productLink" target="_blank" rel="noopener noreferrer">상품 보러가기 ↗</a>
+              <button class="pixel-button secondary" id="nextStageButton" type="button">다음 추격</button>
             </div>
           </div>
         </div>
@@ -104,23 +117,29 @@
 
         <div class="screen game-over-screen" id="gameOverScreen">
           <div class="screen-shade"></div>
-          <div class="result-copy">
+          <div class="modal-panel result-copy">
             <p class="eyebrow">CHASE FAILED</p>
             <h2>도둑을 놓쳤어요</h2>
             <p>회수한 상품 <strong id="failedRecovered">0</strong> / 3</p>
+            <div class="product-cards" id="failedProducts"></div>
+            <a class="pixel-button secondary" id="browseProducts" href="https://www.callamedia.kr/" target="_blank" rel="noopener noreferrer">상품 구경하기 ↗</a>
             <button class="pixel-button primary" id="retryButton" type="button">다시 추격</button>
+            <button class="share-button" type="button">링크 공유</button>
           </div>
         </div>
 
         <div class="screen victory-screen" id="victoryScreen">
           <div class="screen-shade light"></div>
-          <div class="victory-copy">
-            <p class="eyebrow">MISSION COMPLETE</p>
-            <h2>모든 상품을 되찾았습니다!</h2>
-            <p>완벽한 창고 탈환 성공</p>
+          <div class="modal-panel result-panel">
+            <div class="victory-copy">
+              <p class="eyebrow">MISSION COMPLETE</p>
+              <h2>모든 상품을 되찾았습니다!</h2>
+              <p>되찾은 촬영 장비를 만나보세요.</p>
+            </div>
+            <div class="product-cards" id="victoryProducts"></div>
+            <button class="pixel-button secondary" id="victoryRetryButton" type="button">다시 플레이</button>
+            <button class="share-button" type="button">링크 공유</button>
           </div>
-          <div class="victory-products" id="victoryProducts"></div>
-          <button class="pixel-button primary victory-retry" id="victoryRetryButton" type="button">다시 플레이</button>
         </div>
       </section>
 
@@ -130,6 +149,8 @@
         <span><kbd>P</kbd> 일시정지</span>
       </footer>
     </main>
-    <script src="./game.js?v=1.4.0"></script>
+    <script src="./analytics-config.js?v=1.5.0"></script>
+    <script src="./analytics.js?v=1.5.0"></script>
+    <script src="./game.js?v=1.5.0"></script>
   </body>
 </html>

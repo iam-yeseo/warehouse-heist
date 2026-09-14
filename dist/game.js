@@ -4,8 +4,8 @@
   const canvas = document.querySelector("#game");
   const portraitQuery = window.matchMedia("(orientation: portrait) and (max-width: 820px)");
   const compactQuery = window.matchMedia("(max-width: 820px), (max-height: 560px)");
-  const IS_MOBILE_PORTRAIT = portraitQuery.matches;
-  const IS_COMPACT_VIEW = compactQuery.matches;
+  let IS_MOBILE_PORTRAIT = portraitQuery.matches;
+  let IS_COMPACT_VIEW = compactQuery.matches;
   const ctx = canvas.getContext("2d", { alpha: false });
   ctx.imageSmoothingEnabled = false;
 
@@ -48,9 +48,9 @@
     victoryProducts: document.querySelector("#victoryProducts"),
   };
 
-  const W = canvas.width;
-  const H = canvas.height;
-  const GROUND_Y = 605;
+  let W = 1280;
+  let H = 720;
+  let GROUND_Y = 605;
   const STAGE_SECONDS = 30;
   const BOOST_CHARGE_SECONDS = 10;
   const BOOST_SECONDS = 3;
@@ -62,7 +62,7 @@
   const SPEED_ACCELERATION = IS_MOBILE_PORTRAIT ? 40 : 46;
   const OBSTACLE_VISUAL_SCALE = IS_MOBILE_PORTRAIT ? 1.3 : 1.1;
   const VEHICLE_FRAME_RATIO = (1870 / 8) / (841 / 6);
-  const ASSET_VERSION = "1.4.0";
+  const ASSET_VERSION = "1.5.0";
   const paths = {
     root: "./assets/game/",
     ui: "./assets/game/ui/items/",
@@ -154,35 +154,91 @@
   };
 
   const manifest = {
-    heroVehicle: "hero-vehicle.png",
-    thiefVehicle: "thief-vehicle.png",
-    s1bg1: "stage 1/bg-1.png",
-    s1bg2: "stage 1/bg-2.png",
-    s1bg3: "stage 1/bg-3.png",
-    s1bg4: "stage 1/bg-4.png",
-    s2bg: "stage 2/bg-stage-2-parallax.png",
-    s3bg: "stage 3/bg-stage-3-parallax.png",
+    heroVehicle: "hero-vehicle.webp",
+    thiefVehicle: "thief-vehicle.webp",
+    s1bg1: "stage-1/bg-1.webp",
+    s1bg2: "stage-1/bg-2.webp",
+    s1bg3: "stage-1/bg-3.webp",
+    s1bg4: "stage-1/bg-4.webp",
+    s2bg: "stage-2/bg-stage-2-parallax.webp",
+    s3bg: "stage-3/bg-stage-3-parallax.webp",
   };
 
   for (let stage = 1; stage <= 3; stage += 1) {
     for (let obstacle = 1; obstacle <= 5; obstacle += 1) {
-      const filename = stage === 1 ? `obstacle-${obstacle}.png` : `obstacle-${stage}-${obstacle}.png`;
-      manifest[`s${stage}o${obstacle}`] = `stage ${stage}/${filename}`;
+      const filename = stage === 1 ? `obstacle-${obstacle}.webp` : `obstacle-${stage}-${obstacle}.webp`;
+      manifest[`s${stage}o${obstacle}`] = `stage-${stage}/${filename}`;
     }
   }
-  for (let product = 1; product <= 10; product += 1) manifest[`product${product}`] = `product/product-${product}.png`;
-  for (const group of ["boost", "shield", "dust", "collision", "recovery-sparkle"]) {
+
+  for (const group of ["boost", "shield", "dust", "collision"]) {
     for (let frame = 1; frame <= 6; frame += 1) {
       const n = String(frame).padStart(2, "0");
-      manifest[`${group}${frame}`] = `effects/vfx/${group}-${n}.png`;
+      manifest[`${group}${frame}`] = `effects/vfx/${group}-${n}.webp`;
     }
-  }
-  for (let frame = 1; frame <= 8; frame += 1) {
-    const n = String(frame).padStart(2, "0");
-    manifest[`case${frame}`] = `effects/recovery/case-${n}.png`;
   }
 
   const assets = {};
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+  function readSaved() {
+    try {
+      const value = JSON.parse(localStorage.getItem("heist-record") || "{}");
+      if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+      return {
+        muted: value.muted === true,
+        maxRecovered: Math.max(0, Math.min(3, Number(value.maxRecovered) || 0)),
+        completed: value.completed === true,
+        bestSeconds: Number.isFinite(value.bestSeconds) && value.bestSeconds > 0 ? value.bestSeconds : undefined,
+      };
+    } catch { return {}; }
+  }
+  let record = readSaved();
+  let muted = record.muted === true;
+  let campaignElapsed = 0;
+  const track = (event, parameters = {}) => window.heistTrack?.(event, parameters);
+  const productCopy = ["", "가볍게 챙기는 무선 녹음 장비", "양방향 지향성으로 담는 현장의 소리", "촬영 공간을 밝히는 바이컬러 조명", "부드러운 빛을 만드는 촬영 액세서리", "다양한 장면을 위한 크로마키 배경", "촬영 장비를 담아 함께 떠나는 가방", "HDMI 2.0 신호를 전하는 광케이블", "촬영을 위한 COB LED 조명", "RGB 컬러로 연출하는 촬영 조명", "자유롭게 움직이며 녹음하는 무선마이크"];
+  function saveRecord(completed = false) {
+    record.maxRecovered = Math.max(Number(record.maxRecovered) || 0, recoveredProducts.length);
+    if (completed) {
+      record.completed = true;
+      record.bestSeconds = Math.min(Number(record.bestSeconds) || Infinity, campaignElapsed);
+    }
+    record.muted = muted;
+    try { localStorage.setItem("heist-record", JSON.stringify(record)); } catch {}
+    document.querySelector("#recordSummary").textContent = record.completed
+      ? `탈환 성공 기록 · 최고 ${Number(record.bestSeconds).toFixed(1)}초`
+      : record.maxRecovered ? `지난번 ${record.maxRecovered}/3개 회수! 이번엔 끝까지 달려보세요.` : "";
+  }
+  function productUrl(id, placement, stage = recoveredProducts.indexOf(id) + 1) {
+    const url = new URL(products[id].url);
+    for (const [key, value] of Object.entries({utm_source:"heist", utm_medium:"game", utm_campaign:"warehouse", utm_content:`${placement}_stage${stage}`})) url.searchParams.set(key, value);
+    return url.href;
+  }
+  function bindProductLink(link, id, placement, stage) {
+    link.href = productUrl(id, placement, stage);
+    link.dataset.productId = id;
+    link.dataset.stage = stage;
+    link.dataset.placement = placement;
+  }
+  function renderProductCards(container, ids, placement) {
+    container.replaceChildren();
+    for (const id of ids) {
+      const link = document.createElement("a");
+      link.className = "product-card";
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      bindProductLink(link, id, placement, recoveredProducts.indexOf(id) + 1);
+      const image = document.createElement("img");
+      image.src = `${paths.products}product-${id}.webp`;
+      image.alt = products[id].name;
+      const name = document.createElement("strong");
+      name.textContent = products[id].name;
+      const action = document.createElement("span");
+      action.textContent = "상품 보러가기 ↗";
+      link.append(image, name, action);
+      container.append(link);
+    }
+  }
   let state = "loading";
   let stageIndex = 0;
   let stageElapsed = 0;
@@ -209,9 +265,9 @@
   let renderedGauge = "";
 
   function createPlayer() {
-    const width = IS_MOBILE_PORTRAIT ? 270 : 226;
+    const width = IS_MOBILE_PORTRAIT ? 230 : 226;
     const height = Math.round(width / VEHICLE_FRAME_RATIO);
-    return { x: IS_MOBILE_PORTRAIT ? 82 : 138, y: GROUND_Y - height, w: width, h: height, vy: 0, jumps: 0, hurt: 0, land: 0 };
+    return { x: IS_MOBILE_PORTRAIT ? 45 : 138, y: GROUND_Y - height, w: width, h: height, vy: 0, jumps: 0, hurt: 0, land: 0 };
   }
 
   function loadImage(key, source) {
@@ -239,15 +295,33 @@
     ctx.restore();
   }
 
+  const pendingAssets = new Map();
+  function ensureAsset(key) {
+    if (assets[key]) return Promise.resolve();
+    if (!pendingAssets.has(key)) pendingAssets.set(key, loadImage(key, manifest[key]).then(result => {
+      if (!result.image) throw new Error(`Asset unavailable: ${key}`);
+      assets[key] = result.image;
+    }).finally(() => pendingAssets.delete(key)));
+    return pendingAssets.get(key);
+  }
+  function ensureStage(index) {
+    return Promise.all(Object.keys(manifest).filter(key => key.startsWith(`s${index + 1}`)).map(ensureAsset));
+  }
   async function preload() {
-    const entries = Object.entries(manifest);
+    const started = performance.now();
+    const entries = Object.keys(manifest).filter(key => !/^s[23]/.test(key));
     let loaded = 0;
-    const tasks = entries.map(([key, source]) => loadImage(key, source).then((result) => {
+    document.querySelector("#loadingRetry").hidden = true;
+    const results = await Promise.allSettled(entries.map(key => ensureAsset(key).then(() => {
       loaded += 1;
-      ui.loadingBar.style.width = `${Math.round((loaded / entries.length) * 100)}%`;
-      assets[result.key] = result.image;
-    }));
-    await Promise.all(tasks);
+      ui.loadingBar.style.width = `${Math.round(loaded / entries.length * 100)}%`;
+      document.querySelector("#loadingCount").textContent = `${loaded} / ${entries.length}`;
+    })));
+    if (results.some(result => result.status === "rejected")) {
+      document.querySelector("#loadingCount").textContent = "일부 이미지를 받지 못했어요. 다시 시도해 주세요.";
+      document.querySelector("#loadingRetry").hidden = false;
+      return;
+    }
     if (document.fonts?.ready) await document.fonts.ready;
     warmObstacleTextures();
     state = "menu";
@@ -255,6 +329,7 @@
     ui.introScreen.classList.add("is-visible");
     prepareProductSlots();
     updateHud();
+    track("game_load", {loading_ms: Math.round(performance.now() - started)});
   }
 
   function prepareProductSlots() {
@@ -277,6 +352,10 @@
   }
 
   function resetCampaign() {
+    if (["loading", "stage-loading", "countdown"].includes(state)) return;
+    campaignElapsed = 0;
+    track("game_start", {device: matchMedia("(pointer: coarse)").matches ? "touch" : "desktop", orientation: portraitQuery.matches ? "portrait" : "landscape"});
+    ensureStage(1).then(() => ensureStage(2)).catch(() => {});
     stageIndex = 0;
     lives = 3;
     selectedProducts = chooseProducts();
@@ -292,7 +371,16 @@
     }
   }
 
-  function beginStage(index) {
+  async function beginStage(index) {
+    if (state === "stage-loading") return;
+    state = "stage-loading";
+    ui.nextStageButton.disabled = true;
+    try { await ensureStage(index); } catch {
+      state = "stage-clear";
+      ui.nextStageButton.disabled = false;
+      showNotice("도로를 불러오지 못했어요. 다시 눌러 주세요.");
+      return;
+    }
     stageIndex = index;
     stageElapsed = 0;
     worldDistance = 0;
@@ -318,6 +406,7 @@
     ui.countdown.classList.add("is-visible");
     playTone(360, .06, "square", .025);
     const timer = window.setInterval(() => {
+      if (document.hidden) return;
       count -= 1;
       if (count > 0) {
         ui.countdown.textContent = count;
@@ -360,6 +449,7 @@
     if (state !== "playing") return;
 
     stageElapsed += dt;
+    campaignElapsed += dt;
     invulnerableTime = Math.max(0, invulnerableTime - dt);
     player.hurt = Math.max(0, player.hurt - dt);
     player.land = Math.max(0, player.land - dt);
@@ -493,6 +583,8 @@
   function completeStage() {
     if (state !== "playing") return;
     state = "stage-clear";
+    window.clearTimeout(noticeTimer);
+    ui.notice.classList.remove("is-visible");
     obstacles = [];
     boostTime = 0;
     const productNumber = selectedProducts[stageIndex];
@@ -500,17 +592,22 @@
     recoveredProducts.push(productNumber);
     ui.clearStageLabel.textContent = `스테이지 ${stageIndex + 1}`;
     ui.recoveryCount.textContent = `상품 회수 ${recoveredProducts.length} / 3`;
-    ui.recoveredProduct.src = `${paths.products}product-${productNumber}.png`;
+    ui.recoveredProduct.src = `${paths.products}product-${productNumber}.webp`;
     ui.recoveredProduct.alt = product.name;
     ui.recoveredProduct.classList.remove("is-visible");
     ui.recoveredProductName.textContent = product.name;
-    ui.productLink.href = product.url;
+    bindProductLink(ui.productLink, productNumber, "recovery", stageIndex + 1);
+    bindProductLink(document.querySelector("#productImageLink"), productNumber, "recovery_image", stageIndex + 1);
+    document.querySelector("#recoveredProductCopy").textContent = productCopy[productNumber];
+    saveRecord();
+    track("stage_clear", {stage:stageIndex + 1, time_left:Math.max(0, STAGE_SECONDS - stageElapsed), hearts:lives});
     ui.productLink.setAttribute("aria-label", `${product.name} 상품 페이지 새 창에서 열기`);
     ui.nextStageButton.textContent = stageIndex === 2 ? "탈환 결과 보기" : "다음 추격";
     ui.nextStageButton.disabled = true;
-    ui.recoveryCase.src = `${paths.recovery}case-01.png`;
+    ui.recoveryCase.src = `${paths.recovery}case-01.webp`;
     ui.stageClearScreen.classList.add("is-visible");
     updateProductSlots();
+    updateHud();
     animateRecovery();
     playTone(680, .12, "square", .03);
   }
@@ -520,7 +617,7 @@
     let frame = 1;
     recoveryTimer = window.setInterval(() => {
       frame += 1;
-      ui.recoveryCase.src = `${paths.recovery}case-${String(Math.min(frame, 8)).padStart(2, "0")}.png`;
+      ui.recoveryCase.src = `${paths.recovery}case-${String(Math.min(frame, 8)).padStart(2, "0")}.webp`;
       if (frame === 6) {
         ui.recoveredProduct.classList.add("is-visible");
         playTone(930, .16, "square", .025);
@@ -538,7 +635,7 @@
       if (index < recoveredProducts.length) {
         slot.classList.add("is-filled");
         const image = document.createElement("img");
-        image.src = `${paths.products}product-${recoveredProducts[index]}.png`;
+        image.src = `${paths.products}product-${recoveredProducts[index]}.webp`;
         image.alt = `${index + 1}번째 회수 상품`;
         slot.append(image);
         slot.setAttribute("aria-label", `${index + 1}번째 상품 회수 완료`);
@@ -552,6 +649,12 @@
   function endGame() {
     if (state === "game-over") return;
     state = "game-over";
+    window.clearTimeout(noticeTimer);
+    ui.notice.classList.remove("is-visible");
+    saveRecord();
+    track("game_over", {stage:stageIndex + 1, recovered_count:recoveredProducts.length});
+    renderProductCards(document.querySelector("#failedProducts"), recoveredProducts, "failure");
+    updateHud();
     ui.failedRecovered.textContent = recoveredProducts.length;
     ui.gameOverScreen.classList.add("is-visible");
     ui.hud.style.opacity = "0";
@@ -561,13 +664,10 @@
   function showVictory() {
     state = "victory";
     ui.stageClearScreen.classList.remove("is-visible");
-    ui.victoryProducts.replaceChildren();
-    for (const productNumber of recoveredProducts) {
-      const image = document.createElement("img");
-      image.src = `${paths.products}product-${productNumber}.png`;
-      image.alt = `회수한 상품 ${productNumber}`;
-      ui.victoryProducts.append(image);
-    }
+    renderProductCards(ui.victoryProducts, recoveredProducts, "complete");
+    saveRecord(true);
+    track("game_complete", {total_seconds:Number(campaignElapsed.toFixed(2))});
+    updateHud();
     ui.victoryScreen.classList.add("is-visible");
     ui.hud.style.opacity = "0";
     playWinJingle();
@@ -585,7 +685,11 @@
   }
 
   function updateHud() {
-    ui.hud.style.opacity = ["playing", "paused", "countdown", "stage-clear"].includes(state) ? "1" : "0";
+    const active = ["playing", "paused", "countdown"].includes(state);
+    document.querySelector("#gameFrame").dataset.state = state;
+    ui.hud.style.opacity = active ? "1" : "0";
+    ui.hud.inert = !active;
+    document.querySelector(".mobile-actions").inert = state !== "playing";
     ui.stageNumber.textContent = `STAGE ${stageIndex + 1}`;
     ui.stageName.textContent = stages[stageIndex].name;
     ui.stageProgress.style.width = `${Math.min(100, (stageElapsed / STAGE_SECONDS) * 100)}%`;
@@ -595,7 +699,7 @@
       ui.lives.replaceChildren();
       for (let index = 0; index < 3; index += 1) {
         const image = document.createElement("img");
-        image.src = `${paths.ui}${index < lives ? "heart-full" : "heart-empty"}.png`;
+        image.src = `${paths.ui}${index < lives ? "heart-full" : "heart-empty"}.webp`;
         image.alt = "";
         ui.lives.append(image);
       }
@@ -607,7 +711,7 @@
     else if (safeTime > 0) gauge = "boost-gauge-charging";
     if (gauge !== renderedGauge) {
       renderedGauge = gauge;
-      ui.boostGauge.src = `${paths.ui}${gauge}.png`;
+      ui.boostGauge.src = `${paths.ui}${gauge}.webp`;
     }
     if (boostTime > 0) ui.boostLabel.textContent = `부스트 ${boostTime.toFixed(1)}초`;
     else if (boostReady) ui.boostLabel.textContent = "사용 가능!";
@@ -619,15 +723,16 @@
 
   function draw() {
     ctx.save();
-    if (screenShake > 0 && state === "playing") {
+    ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
+    if (!reducedMotion.matches && screenShake > 0 && state === "playing") {
       screenShake = Math.max(0, screenShake - 1 / 60);
       ctx.translate((Math.random() - .5) * 12, (Math.random() - .5) * 8);
     }
     drawBackground();
-    drawSpeedLines();
+    if (!reducedMotion.matches) drawSpeedLines();
     drawThief();
     drawObstacles();
-    drawEffects();
+    if (!reducedMotion.matches) drawEffects();
     drawPlayer();
     drawSpeedReadout();
     ctx.restore();
@@ -708,7 +813,7 @@
   function drawPlayer() {
     const row = player.hurt > 0 ? 5 : boostTime > 0 ? 2 : player.jumps > 0 ? (player.jumps === 2 ? 4 : 3) : 0;
     const column = Math.floor(worldDistance / (boostTime > 0 ? 32 : 44)) % 8;
-    const flicker = invulnerableTime > 0 && boostTime <= 0 && Math.floor(invulnerableTime * 14) % 2 === 0;
+    const flicker = !reducedMotion.matches && invulnerableTime > 0 && boostTime <= 0 && Math.floor(invulnerableTime * 14) % 2 === 0;
     if (!flicker) drawSheetFrame(assets.heroVehicle, 8, 6, column, row, player.x, player.y, player.w, player.h);
     if (boostTime > 0) {
       const frame = (Math.floor((BOOST_SECONDS - boostTime) * 12) % 6) + 1;
@@ -731,7 +836,7 @@
     }
     const width = 202;
     const height = Math.round(width / VEHICLE_FRAME_RATIO);
-    const drawX = Math.max(885, Math.min(1070, 1005 + (BASE_SPEED - (boostTime > 0 ? 1180 : speed)) * .28));
+    const drawX = Math.max(W - 395, Math.min(W - 210, W - 275 + (BASE_SPEED - (boostTime > 0 ? 1180 : speed)) * .28));
     drawSheetFrame(assets.thiefVehicle, 8, 6, column, row, drawX, GROUND_Y - height, width, height);
   }
 
@@ -785,6 +890,7 @@
   }
 
   function playTone(frequency, duration, type = "square", volume = .025) {
+    if (muted) return;
     try {
       audioContext ??= new (window.AudioContext || window.webkitAudioContext)();
       if (audioContext.state === "suspended") audioContext.resume();
@@ -825,7 +931,9 @@
   ui.boostButton.addEventListener("pointerdown", (event) => { event.preventDefault(); useBoost(); });
 
   window.addEventListener("keydown", (event) => {
-    if (["Space", "ArrowUp", "KeyW"].includes(event.code)) {
+    if (event.target.closest?.("input, textarea, select, [contenteditable=true]")) return;
+    if (["Space", "Enter"].includes(event.code) && event.target.closest?.("button, a")) return;
+    if (["Space", "ArrowUp", "KeyW"].includes(event.code) && state === "playing") {
       event.preventDefault();
       if (!event.repeat) queueJump();
     }
@@ -841,7 +949,61 @@
     if (document.hidden && state === "playing") togglePause();
   });
 
-  portraitQuery.addEventListener("change", () => window.location.reload());
+  function resizeGame() {
+    const oldGround = GROUND_Y;
+    const oldPlayerX = player.x;
+    IS_MOBILE_PORTRAIT = portraitQuery.matches;
+    IS_COMPACT_VIEW = compactQuery.matches;
+    const rect = canvas.getBoundingClientRect();
+    W = IS_MOBILE_PORTRAIT ? 720 : 1280;
+    H = IS_MOBILE_PORTRAIT ? Math.round(W * rect.height / Math.max(1, rect.width)) : 720;
+    GROUND_Y = H - 115;
+    player.x = IS_MOBILE_PORTRAIT ? 45 : 138;
+    player.y += GROUND_Y - oldGround;
+    for (const obstacle of obstacles) {
+      obstacle.x += player.x - oldPlayerX;
+      obstacle.y += GROUND_Y - oldGround;
+      obstacle.baseY += GROUND_Y - oldGround;
+    }
+    for (const effect of effects) { effect.x += player.x - oldPlayerX; effect.y += GROUND_Y - oldGround; }
+    const scale = Math.min(1, rect.width * Math.min(window.devicePixelRatio || 1, 2) / W);
+    canvas.width = Math.round(W * scale);
+    canvas.height = Math.round(H * scale);
+    ctx.imageSmoothingEnabled = false;
+    if (state === "playing") togglePause();
+  }
+  new ResizeObserver(resizeGame).observe(canvas);
+  document.querySelector("#loadingRetry").addEventListener("click", preload);
+  const soundButton = document.querySelector("#soundButton");
+  function updateSoundButton() {
+    soundButton.textContent = muted ? "소리 끔" : "소리 켬";
+    soundButton.setAttribute("aria-pressed", String(muted));
+    soundButton.setAttribute("aria-label", muted ? "효과음 켜기" : "효과음 끄기");
+  }
+  soundButton.addEventListener("click", () => {
+    muted = !muted;
+    if (muted) audioContext?.suspend();
+    saveRecord();
+    updateSoundButton();
+  });
+  updateSoundButton();
+  saveRecord();
+  document.addEventListener("click", event => {
+    const link = event.target.closest("a[data-product-id]");
+    if (link) track("product_click", {product_id:Number(link.dataset.productId), stage:Number(link.dataset.stage), placement:link.dataset.placement});
+  });
+  const browse = document.querySelector("#browseProducts");
+  browse.href += "?utm_source=heist&utm_medium=game&utm_campaign=warehouse&utm_content=failure_browse";
+  browse.addEventListener("click", () => track("shop_click", {stage:stageIndex + 1, recovered_count:recoveredProducts.length}));
+  for (const button of document.querySelectorAll(".share-button")) button.addEventListener("click", async () => {
+    const url = "https://heist.yeseo.im/";
+    try {
+      if (navigator.share) await navigator.share({title:"창고 탈환 작전", text:"도둑을 추격하고 상품 3개를 되찾으세요!", url});
+      else { await navigator.clipboard.writeText(url); button.textContent = "링크 복사 완료!"; }
+    } catch (error) {
+      if (error.name !== "AbortError") { button.textContent = "주소를 복사해 주세요"; window.prompt("공유할 링크", url); }
+    }
+  });
 
   window.requestAnimationFrame(loop);
   preload();
