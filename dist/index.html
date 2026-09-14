@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+    <meta name="theme-color" content="#171421" />
+    <meta name="description" content="창고에서 탈출한 상품을 잡는 8비트 점프 게임" />
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23171421'/%3E%3Cpath d='M10 22 32 10l22 12v30H10z' fill='%23F27490'/%3E%3Cpath d='M18 30h28v22H18z' fill='%23ffb13b'/%3E%3Cpath d='M26 36h12v16H26z' fill='%23171421'/%3E%3C/svg%3E" />
+    <title>창고 대방출!</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main class="game-shell">
+      <header class="topbar" aria-label="게임 현황">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">BOX</span>
+          <div><strong>창고 대방출!</strong><small>ESCAPE ITEMS</small></div>
+        </div>
+        <div class="stats">
+          <div><span>점수</span><strong id="score">0000</strong></div>
+          <div><span>남은 시간</span><strong id="time">45</strong></div>
+        </div>
+      </header>
+
+      <section class="game-frame" aria-label="창고 대방출 게임">
+        <canvas id="game" width="360" height="640" aria-label="좌우로 움직이고 점프해 상품을 수집하는 게임"></canvas>
+        <div class="scanlines" aria-hidden="true"></div>
+
+        <div class="overlay is-visible" id="startOverlay">
+          <p class="eyebrow">SEPTEMBER EVENT</p>
+          <h1>도망친 상품을<br /><em>잡아라!</em></h1>
+          <div class="pixel-box" aria-hidden="true"><span>?</span></div>
+          <p class="intro">발판을 밟고 점프해<br />창고를 탈출한 상품을 회수하세요.</p>
+          <div class="key-guide" aria-label="조작 방법">
+            <span><kbd>←</kbd><kbd>→</kbd> 이동</span>
+            <span><kbd>SPACE</kbd> 점프</span>
+          </div>
+          <button class="primary-button" id="startButton" type="button">게임 시작</button>
+        </div>
+
+        <div class="overlay result" id="resultOverlay" aria-live="polite">
+          <p class="eyebrow">WAREHOUSE REPORT</p>
+          <p class="result-rank" id="resultRank">재고 신입</p>
+          <h2><span id="finalScore">0</span>점</h2>
+          <p id="resultMessage">상품을 더 잡아볼까요?</p>
+          <dl>
+            <div><dt>회수 상품</dt><dd id="finalItems">0개</dd></div>
+            <div><dt>최고 콤보</dt><dd id="finalCombo">0</dd></div>
+          </dl>
+          <button class="primary-button" id="retryButton" type="button">다시 도전</button>
+        </div>
+
+        <div class="toast" id="toast" aria-live="polite"></div>
+
+        <div class="mobile-controls" aria-label="모바일 게임 조작">
+          <div class="direction-controls">
+            <button class="control-button" id="leftButton" type="button" aria-label="왼쪽으로 이동">◀</button>
+            <button class="control-button" id="rightButton" type="button" aria-label="오른쪽으로 이동">▶</button>
+          </div>
+          <button class="control-button jump-button" id="jumpButton" type="button" aria-label="점프">JUMP</button>
+        </div>
+      </section>
+
+      <footer>
+        <span>← → / A D 이동</span><span>SPACE / W / ↑ 점프</span>
+      </footer>
+    </main>
+    <script src="./game.js"></script>
+  </body>
+</html>
