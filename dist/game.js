@@ -37,6 +37,8 @@
     clearStageLabel: document.querySelector("#clearStageLabel"),
     recoveryCase: document.querySelector("#recoveryCase"),
     recoveredProduct: document.querySelector("#recoveredProduct"),
+    recoveredProductName: document.querySelector("#recoveredProductName"),
+    productLink: document.querySelector("#productLink"),
     recoveryCount: document.querySelector("#recoveryCount"),
     failedRecovered: document.querySelector("#failedRecovered"),
     victoryProducts: document.querySelector("#victoryProducts"),
@@ -49,6 +51,11 @@
   const BOOST_CHARGE_SECONDS = 10;
   const BOOST_SECONDS = 3;
   const GRAVITY = 1940;
+  const BASE_SPEED = 600;
+  const MAX_SPEED = 900;
+  const BOOST_SPEED = 1450;
+  const CRASH_SPEED = 430;
+  const SPEED_ACCELERATION = 46;
   const paths = {
     root: "./assets/game/",
     ui: "./assets/game/ui/items/",
@@ -96,6 +103,49 @@
     },
   ];
 
+  const products = {
+    1: {
+      name: "RimoMic Lite UC 미니무선마이크세트",
+      url: "https://www.callamedia.kr/goods/goods_search.php?adUrl=%2Fgoods%2Fgoods_view.php%3FgoodsNo%3D3500&keyword=Rimo&recentCount=3",
+    },
+    2: {
+      name: "MinBo M2 양방향 지향성 샷건마이크",
+      url: "https://www.callamedia.kr/goods/goods_search.php?reSearchKeyword%5B%5D=MinBo&reSearchKey%5B%5D=all&sort=&pageNum=150&reSearch=y&key=goodsNm&keyword=%EC%83%B7%EA%B1%B4%EB%A7%88%EC%9D%B4%ED%81%AC",
+    },
+    3: {
+      name: "고출력 바이컬러 LED 라이트",
+      url: "https://www.callamedia.kr/goods/goods_search.php?reSearchKeyword%5B%5D=%EA%B3%A0%EC%B6%9C%EB%A0%A5&reSearchKey%5B%5D=all&sort=&pageNum=150&key=goodsNm&keyword=%EC%B9%BC%EB%9D%BC+0",
+    },
+    4: {
+      name: "파라볼릭 소프트박스",
+      url: "https://www.callamedia.kr/goods/goods_search.php?adUrl=%2Fgoods%2Fgoods_view.php%3FgoodsNo%3D3500&keyword=%ED%8C%8C%EB%9D%BC%EB%B3%BC%EB%A6%AD&recentCount=3",
+    },
+    5: {
+      name: "크로마키 배경천(조립식)",
+      url: "https://www.callamedia.kr/goods/goods_search.php?adUrl=%2Fgoods%2Fgoods_view.php%3FgoodsNo%3D3500&keyword=CBD-&recentCount=3",
+    },
+    6: {
+      name: "카메라가방(사진영상용 가방)",
+      url: "https://www.callamedia.kr/goods/goods_search.php?reSearchKeyword%5B%5D=%EC%B9%B4%EB%A9%94%EB%9D%BC%EA%B0%80%EB%B0%A9&reSearchKey%5B%5D=all&sort=&pageNum=150&reSearch=y&key=goodsNm&keyword=CCB",
+    },
+    7: {
+      name: "HDMI 리피터 광케이블(HDMI 2.0)",
+      url: "https://www.callamedia.kr/goods/goods_view.php?goodsNo=3754",
+    },
+    8: {
+      name: "COB타입 LED 라이트",
+      url: "https://www.callamedia.kr/goods/goods_search.php?adUrl=%2Fgoods%2Fgoods_view.php%3FgoodsNo%3D3500&keyword=sk-d&recentCount=3",
+    },
+    9: {
+      name: "소카니 X50 RGB LED 라이트",
+      url: "https://www.callamedia.kr/goods/goods_search.php?adUrl=%2Fgoods%2Fgoods_view.php%3FgoodsNo%3D3310&keyword=sokani&recentCount=3",
+    },
+    10: {
+      name: "코미카 무선마이크 세트",
+      url: "https://www.callamedia.kr/goods/goods_search.php?reSearchKeyword%5B%5D=%EC%BD%94%EB%AF%B8%EC%B9%B4&reSearchKey%5B%5D=all&sort=&pageNum=150&reSearch=y&key=goodsNm&keyword=%EB%AC%B4%EC%84%A0%EB%A7%88%EC%9D%B4%ED%81%AC",
+    },
+  };
+
   const manifest = {
     heroVehicle: "hero-vehicle.png",
     thiefVehicle: "thief-vehicle.png",
@@ -130,7 +180,7 @@
   let stageIndex = 0;
   let stageElapsed = 0;
   let worldDistance = 0;
-  let speed = 340;
+  let speed = BASE_SPEED;
   let lives = 3;
   let safeTime = 0;
   let boostReady = false;
@@ -192,7 +242,7 @@
   }
 
   function chooseProducts() {
-    const pool = Array.from({ length: 10 }, (_, index) => index + 1);
+    const pool = Object.keys(products).map(Number);
     for (let index = pool.length - 1; index > 0; index -= 1) {
       const swap = Math.floor(Math.random() * (index + 1));
       [pool[index], pool[swap]] = [pool[swap], pool[index]];
@@ -220,7 +270,7 @@
     stageIndex = index;
     stageElapsed = 0;
     worldDistance = 0;
-    speed = 340;
+    speed = BASE_SPEED;
     safeTime = 0;
     boostReady = false;
     boostTime = 0;
@@ -301,8 +351,8 @@
       }
     }
 
-    if (boostTime <= 0) speed = Math.min(520, speed + 18 * dt);
-    const worldSpeed = boostTime > 0 ? 880 : speed;
+    if (boostTime <= 0) speed = Math.min(MAX_SPEED, speed + SPEED_ACCELERATION * dt);
+    const worldSpeed = boostTime > 0 ? BOOST_SPEED : speed;
     worldDistance += worldSpeed * dt;
 
     player.vy += GRAVITY * dt;
@@ -357,7 +407,7 @@
       destroyed: false,
     };
     obstacles.push(obstacle);
-    nextObstacleIn = Math.max(1.6, 2.75 - (speed - 340) / 300) + Math.random() * .85;
+    nextObstacleIn = Math.max(1.8, 2.65 - (speed - BASE_SPEED) / 600) + Math.random() * .75;
     thiefThrowTime = .7;
   }
 
@@ -388,7 +438,7 @@
     invulnerableTime = 1.8;
     player.hurt = .5;
     screenShake = .36;
-    speed = 255;
+    speed = CRASH_SPEED;
     safeTime = 0;
     boostReady = false;
     addEffect("collision", player.x + player.w - 25, player.y + 35, 175, .55);
@@ -414,11 +464,16 @@
     obstacles = [];
     boostTime = 0;
     const productNumber = selectedProducts[stageIndex];
+    const product = products[productNumber];
     recoveredProducts.push(productNumber);
     ui.clearStageLabel.textContent = `스테이지 ${stageIndex + 1}`;
     ui.recoveryCount.textContent = `상품 회수 ${recoveredProducts.length} / 3`;
     ui.recoveredProduct.src = `${paths.products}product-${productNumber}.png`;
+    ui.recoveredProduct.alt = product.name;
     ui.recoveredProduct.classList.remove("is-visible");
+    ui.recoveredProductName.textContent = product.name;
+    ui.productLink.href = product.url;
+    ui.productLink.setAttribute("aria-label", `${product.name} 상품 페이지 새 창에서 열기`);
     ui.nextStageButton.textContent = stageIndex === 2 ? "탈환 결과 보기" : "다음 추격";
     ui.nextStageButton.disabled = true;
     ui.recoveryCase.src = `${paths.recovery}case-01.png`;
@@ -550,12 +605,12 @@
     ctx.fillStyle = stages[stageIndex].palette;
     ctx.fillRect(0, 0, W, H);
     if (stageIndex === 0) {
-      drawRepeating(assets.s1bg1, worldDistance * .06);
-      drawRepeating(assets.s1bg2, worldDistance * .16);
-      drawRepeating(assets.s1bg3, worldDistance * .3);
-      drawRepeating(assets.s1bg4, worldDistance * .58);
+      drawRepeating(assets.s1bg1, worldDistance * .1);
+      drawRepeating(assets.s1bg2, worldDistance * .3);
+      drawRepeating(assets.s1bg3, worldDistance * .62);
+      drawRepeating(assets.s1bg4, worldDistance * 1.18);
     } else {
-      drawRepeating(stageIndex === 1 ? assets.s2bg : assets.s3bg, worldDistance * .28);
+      drawRepeating(stageIndex === 1 ? assets.s2bg : assets.s3bg, worldDistance * .66);
     }
     const roadShade = ctx.createLinearGradient(0, GROUND_Y - 90, 0, H);
     roadShade.addColorStop(0, "#06132900");
@@ -573,19 +628,21 @@
   }
 
   function drawSpeedLines() {
-    if (boostTime <= 0) return;
-    ctx.fillStyle = "#25def199";
-    for (let index = 0; index < 13; index += 1) {
-      const y = 125 + ((index * 47 + worldDistance * .8) % 480);
-      const length = 70 + (index % 4) * 32;
-      const x = (W - ((worldDistance * 2.2 + index * 133) % (W + 220)));
-      ctx.fillRect(x, y, length, 5);
+    const boosting = boostTime > 0;
+    const intensity = boosting ? 1 : .35 + ((speed - CRASH_SPEED) / (MAX_SPEED - CRASH_SPEED)) * .35;
+    const count = boosting ? 20 : 12;
+    ctx.fillStyle = boosting ? "#25def1aa" : `rgba(216, 239, 255, ${Math.max(.12, intensity * .32)})`;
+    for (let index = 0; index < count; index += 1) {
+      const y = 108 + ((index * 43 + worldDistance * (boosting ? 1.25 : .72)) % 505);
+      const length = (boosting ? 105 : 48) + (index % 5) * (boosting ? 36 : 19);
+      const x = W - ((worldDistance * (boosting ? 3.1 : 1.75) + index * 137) % (W + 300));
+      ctx.fillRect(x, y, length, boosting ? 6 : 3);
     }
   }
 
   function drawPlayer() {
     const row = player.hurt > 0 ? 5 : boostTime > 0 ? 2 : player.jumps > 0 ? (player.jumps === 2 ? 4 : 3) : 0;
-    const column = Math.floor(worldDistance / (boostTime > 0 ? 38 : 55)) % 8;
+    const column = Math.floor(worldDistance / (boostTime > 0 ? 32 : 44)) % 8;
     const flicker = invulnerableTime > 0 && boostTime <= 0 && Math.floor(invulnerableTime * 14) % 2 === 0;
     if (!flicker) drawSheetFrame(assets.heroVehicle, 8, 6, column, row, player.x, player.y, player.w, player.h);
     if (boostTime > 0) {
@@ -597,8 +654,8 @@
 
   function drawThief() {
     const row = thiefThrowTime > 0 ? 3 : boostTime > 0 ? 1 : 0;
-    const column = Math.floor(worldDistance / 62) % 8;
-    const drawX = Math.max(885, Math.min(1070, 1005 + (340 - (boostTime > 0 ? 720 : speed)) * .42));
+    const column = Math.floor(worldDistance / 48) % 8;
+    const drawX = Math.max(885, Math.min(1070, 1005 + (BASE_SPEED - (boostTime > 0 ? 1180 : speed)) * .28));
     drawSheetFrame(assets.thiefVehicle, 8, 6, column, row, drawX, GROUND_Y - 91, 202, 91);
   }
 
@@ -635,7 +692,7 @@
 
   function drawSpeedReadout() {
     if (!["playing", "paused", "countdown"].includes(state)) return;
-    const kmh = Math.round((boostTime > 0 ? 880 : speed) * .22);
+    const kmh = Math.round((boostTime > 0 ? BOOST_SPEED : speed) * .22);
     ctx.fillStyle = "#06152ddd";
     ctx.fillRect(18, H - 58, 178, 37);
     ctx.strokeStyle = "#476c92";

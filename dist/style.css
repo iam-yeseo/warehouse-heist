@@ -204,7 +204,11 @@ canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; 
 .recovery-case { position: absolute; left: 50%; bottom: 0; width: 270px; height: 190px; transform: translateX(-50%); object-fit: contain; image-rendering: pixelated; }
 .recovered-product { position: absolute; z-index: 2; left: 50%; top: 10px; width: 145px; height: 145px; opacity: 0; transform: translate(-50%, 30px) scale(.4); object-fit: contain; image-rendering: pixelated; filter: drop-shadow(0 0 14px #ffd43d); }
 .recovered-product.is-visible { animation: product-pop .65s steps(6) forwards; }
-.recovery-panel > strong { display: block; margin: 9px 0 20px; color: var(--yellow); font-size: 21px; }
+.recovered-product-name { min-height: 28px; margin: 4px auto 7px; color: var(--white); font-size: clamp(17px, 2vw, 24px); line-height: 1.25; }
+.recovery-panel > strong { display: block; margin: 7px 0 16px; color: var(--yellow); font-size: 18px; }
+.recovery-actions { display: flex; justify-content: center; gap: 12px; }
+.recovery-actions .pixel-button { display: inline-flex; min-width: 190px; align-items: center; justify-content: center; text-decoration: none; }
+.product-link { background: #1b5776; box-shadow: inset 0 -7px #082f48, 5px 5px 0 #0009; }
 
 .pause-screen { background: #020712cc; }
 .compact-panel { width: min(420px, 84%); }
@@ -272,6 +276,9 @@ kbd { display: inline-block; min-width: 27px; padding: 3px 6px; border: 2px soli
   .recovery-case { width: 170px; height: 115px; }
   .recovered-product { width: 85px; height: 85px; }
   .recovery-panel > strong { margin: 4px 0 10px; font-size: 14px; }
+  .recovered-product-name { min-height: 18px; margin: 2px 0 4px; font-size: 13px; }
+  .recovery-actions { gap: 8px; }
+  .recovery-actions .pixel-button { min-width: 145px; }
 }
 
 @media (orientation: portrait) and (max-width: 760px) {
@@ -284,6 +291,7 @@ kbd { display: inline-block; min-width: 27px; padding: 3px 6px; border: 2px soli
   .intro-copy > p:not(.eyebrow), .intro-copy .rules { display: none; }
   .intro-copy .pixel-button { min-width: 112px; min-height: 30px; margin-top: 13px; padding: 5px 10px; font-size: 11px; }
   .stage-clear-screen .modal-panel, .pause-screen .modal-panel { width: 138%; transform: scale(.62); }
+  .recovery-actions .pixel-button { min-width: 150px; }
   .result-copy h2, .victory-copy h2 { font-size: 23px; }
   .result-copy > p:not(.eyebrow), .victory-copy p:last-child { margin: 5px 0 8px; font-size: 10px; }
   .victory-copy { padding-top: 2%; }
