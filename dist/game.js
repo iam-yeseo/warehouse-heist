@@ -56,6 +56,7 @@
   const BOOST_SPEED = 1450;
   const CRASH_SPEED = 430;
   const SPEED_ACCELERATION = 46;
+  const OBSTACLE_VISUAL_SCALE = 1.1;
   const paths = {
     root: "./assets/game/",
     ui: "./assets/game/ui/items/",
@@ -148,7 +149,6 @@
 
   const manifest = {
     heroVehicle: "hero-vehicle.png",
-    callaLogo: "branding/calla-logo.svg",
     thiefVehicle: "thief-vehicle.png",
     s1bg1: "stage 1/bg-1.png",
     s1bg2: "stage 1/bg-2.png",
@@ -676,31 +676,12 @@
     const row = player.hurt > 0 ? 5 : boostTime > 0 ? 2 : player.jumps > 0 ? (player.jumps === 2 ? 4 : 3) : 0;
     const column = Math.floor(worldDistance / (boostTime > 0 ? 32 : 44)) % 8;
     const flicker = invulnerableTime > 0 && boostTime <= 0 && Math.floor(invulnerableTime * 14) % 2 === 0;
-    if (!flicker) {
-      drawSheetFrame(assets.heroVehicle, 8, 6, column, row, player.x, player.y, player.w, player.h);
-      drawCallaLogo(column, row);
-    }
+    if (!flicker) drawSheetFrame(assets.heroVehicle, 8, 6, column, row, player.x, player.y, player.w, player.h);
     if (boostTime > 0) {
       const frame = (Math.floor((BOOST_SECONDS - boostTime) * 12) % 6) + 1;
       const shield = assets[`shield${frame}`];
       if (shield) ctx.drawImage(shield, player.x + player.w / 2 - 102, player.y + player.h / 2 - 102, 204, 204);
     }
-  }
-
-  function drawCallaLogo(column, row) {
-    if (!assets.callaLogo) return;
-    const jumpTilt = row === 3
-      ? [-.01, -.04, -.08, -.11, -.07, .01, .06, .03][column]
-      : row === 4
-        ? [.02, -.03, -.08, -.05, .03, .08, .05, .01][column]
-        : 0;
-    const centerX = player.x + 82;
-    const centerY = player.y + 42;
-    ctx.save();
-    ctx.translate(centerX, centerY);
-    ctx.rotate(jumpTilt);
-    ctx.drawImage(assets.callaLogo, -37, -13, 74, 26);
-    ctx.restore();
   }
 
   function drawThief() {
@@ -724,6 +705,7 @@
       ctx.save();
       ctx.translate(obstacle.x + obstacle.w / 2, obstacle.y + obstacle.h / 2);
       if (obstacle.rolling || obstacle.airborne) ctx.rotate(obstacle.angle);
+      ctx.scale(OBSTACLE_VISUAL_SCALE, OBSTACLE_VISUAL_SCALE);
       ctx.drawImage(image, -obstacle.w / 2, -obstacle.h / 2, obstacle.w, obstacle.h);
       ctx.restore();
     }
