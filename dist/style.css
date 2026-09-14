@@ -10,7 +10,7 @@
   --ink: #07152c;
   --panel: rgba(7, 21, 44, .92);
   --cyan: #25def1;
-  --orange: #ff741f;
+  --orange: #f27490;
   --yellow: #ffd43d;
   --white: #f7fbff;
   --muted: #a9c0dc;
@@ -37,7 +37,7 @@ button { font: inherit; }
   align-content: center;
   gap: 10px;
   padding: 12px;
-  background: radial-gradient(circle at 50% 10%, #25def121, transparent 40rem), linear-gradient(180deg, #07152c, #030813);
+  background: radial-gradient(circle at 20% 10%, #f2749029, transparent 34rem), radial-gradient(circle at 70% 5%, #25def11c, transparent 40rem), linear-gradient(180deg, #07152c, #030813);
 }
 
 .game-frame {
@@ -46,7 +46,7 @@ button { font: inherit; }
   aspect-ratio: 16 / 9;
   overflow: hidden;
   border: 4px solid #020712;
-  outline: 2px solid #335477;
+  outline: 2px solid #7a4964;
   background: var(--ink);
   box-shadow: 0 18px 60px #000b, 8px 8px 0 #10294b;
   isolation: isolate;

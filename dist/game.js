@@ -148,13 +148,14 @@
 
   const manifest = {
     heroVehicle: "hero-vehicle.png",
+    callaLogo: "branding/calla-logo.svg",
     thiefVehicle: "thief-vehicle.png",
     s1bg1: "stage 1/bg-1.png",
     s1bg2: "stage 1/bg-2.png",
     s1bg3: "stage 1/bg-3.png",
     s1bg4: "stage 1/bg-4.png",
-    s2bg: "stage 2/bg-stage-2.png",
-    s3bg: "stage 3/bg-stage-3.png",
+    s2bg: "stage 2/bg-stage-2-parallax.png",
+    s3bg: "stage 3/bg-stage-3-parallax.png",
   };
 
   for (let stage = 1; stage <= 3; stage += 1) {
@@ -609,8 +610,10 @@
       drawRepeating(assets.s1bg2, worldDistance * .3);
       drawRepeating(assets.s1bg3, worldDistance * .62);
       drawRepeating(assets.s1bg4, worldDistance * 1.18);
+    } else if (stageIndex === 1) {
+      drawBandedParallax(assets.s2bg, [0, .45, .59, .8, 1], [.1, .28, .62, 1.12]);
     } else {
-      drawRepeating(stageIndex === 1 ? assets.s2bg : assets.s3bg, worldDistance * .66);
+      drawBandedParallax(assets.s3bg, [0, .34, .46, .76, 1], [.08, .22, .55, 1.08]);
     }
     const roadShade = ctx.createLinearGradient(0, GROUND_Y - 90, 0, H);
     roadShade.addColorStop(0, "#06132900");
@@ -625,6 +628,35 @@
     const drawWidth = image.width * (drawHeight / image.height);
     const wrapped = ((offset % drawWidth) + drawWidth) % drawWidth;
     for (let x = -wrapped; x < W + drawWidth; x += drawWidth) ctx.drawImage(image, x, 0, drawWidth, drawHeight);
+  }
+
+  function drawBandedParallax(image, boundaries, speeds) {
+    if (!image) return;
+    const drawHeight = H;
+    const drawWidth = image.width * (drawHeight / image.height);
+    for (let index = 0; index < speeds.length; index += 1) {
+      const start = boundaries[index];
+      const end = boundaries[index + 1];
+      const sourceY = Math.round(image.height * start);
+      const sourceHeight = Math.max(1, Math.round(image.height * end) - sourceY);
+      const destinationY = Math.round(drawHeight * start);
+      const destinationHeight = Math.max(1, Math.round(drawHeight * end) - destinationY + 1);
+      const offset = worldDistance * speeds[index];
+      const wrapped = ((offset % drawWidth) + drawWidth) % drawWidth;
+      for (let x = -wrapped; x < W + drawWidth; x += drawWidth) {
+        ctx.drawImage(
+          image,
+          0,
+          sourceY,
+          image.width,
+          sourceHeight,
+          x,
+          destinationY,
+          drawWidth,
+          destinationHeight,
+        );
+      }
+    }
   }
 
   function drawSpeedLines() {
@@ -644,12 +676,31 @@
     const row = player.hurt > 0 ? 5 : boostTime > 0 ? 2 : player.jumps > 0 ? (player.jumps === 2 ? 4 : 3) : 0;
     const column = Math.floor(worldDistance / (boostTime > 0 ? 32 : 44)) % 8;
     const flicker = invulnerableTime > 0 && boostTime <= 0 && Math.floor(invulnerableTime * 14) % 2 === 0;
-    if (!flicker) drawSheetFrame(assets.heroVehicle, 8, 6, column, row, player.x, player.y, player.w, player.h);
+    if (!flicker) {
+      drawSheetFrame(assets.heroVehicle, 8, 6, column, row, player.x, player.y, player.w, player.h);
+      drawCallaLogo(column, row);
+    }
     if (boostTime > 0) {
       const frame = (Math.floor((BOOST_SECONDS - boostTime) * 12) % 6) + 1;
       const shield = assets[`shield${frame}`];
       if (shield) ctx.drawImage(shield, player.x + player.w / 2 - 102, player.y + player.h / 2 - 102, 204, 204);
     }
+  }
+
+  function drawCallaLogo(column, row) {
+    if (!assets.callaLogo) return;
+    const jumpTilt = row === 3
+      ? [-.01, -.04, -.08, -.11, -.07, .01, .06, .03][column]
+      : row === 4
+        ? [.02, -.03, -.08, -.05, .03, .08, .05, .01][column]
+        : 0;
+    const centerX = player.x + 82;
+    const centerY = player.y + 42;
+    ctx.save();
+    ctx.translate(centerX, centerY);
+    ctx.rotate(jumpTilt);
+    ctx.drawImage(assets.callaLogo, -37, -13, 74, 26);
+    ctx.restore();
   }
 
   function drawThief() {
