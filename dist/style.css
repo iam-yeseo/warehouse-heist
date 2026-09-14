@@ -16,7 +16,13 @@
   --muted: #a9c0dc;
 }
 
-* { box-sizing: border-box; }
+* {
+  box-sizing: border-box;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+}
 html, body { min-height: 100%; }
 
 body {
@@ -25,7 +31,6 @@ body {
   background: #040c1b;
   color: var(--white);
   touch-action: manipulation;
-  user-select: none;
 }
 
 button { font: inherit; }

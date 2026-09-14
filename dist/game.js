@@ -1015,6 +1015,11 @@
   ui.jumpButton.addEventListener("pointerdown", (event) => { event.preventDefault(); queueJump(); });
   ui.boostButton.addEventListener("pointerdown", (event) => { event.preventDefault(); useBoost(); });
 
+  // Keep the game surface free of browser menus, text selection, and image dragging.
+  for (const eventName of ["contextmenu", "dragstart", "selectstart"]) {
+    document.addEventListener(eventName, (event) => event.preventDefault(), { capture: true });
+  }
+
   window.addEventListener("keydown", (event) => {
     if (event.target.closest?.("input, textarea, select, [contenteditable=true]")) return;
     if (["Space", "Enter"].includes(event.code) && event.target.closest?.("button, a")) return;
