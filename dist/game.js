@@ -4,11 +4,6 @@
   const canvas = document.querySelector("#game");
   const portraitQuery = window.matchMedia("(orientation: portrait) and (max-width: 820px)");
   const IS_MOBILE_PORTRAIT = portraitQuery.matches;
-  if (IS_MOBILE_PORTRAIT) {
-    const viewportRatio = window.innerHeight / Math.max(1, window.innerWidth);
-    canvas.width = 720;
-    canvas.height = Math.round(720 * Math.max(1.6, Math.min(2.2, viewportRatio)));
-  }
   const ctx = canvas.getContext("2d", { alpha: false });
   ctx.imageSmoothingEnabled = false;
 
@@ -53,17 +48,19 @@
 
   const W = canvas.width;
   const H = canvas.height;
-  const GROUND_Y = IS_MOBILE_PORTRAIT ? Math.round(H * .84) : 605;
+  const GROUND_Y = 605;
   const STAGE_SECONDS = 30;
   const BOOST_CHARGE_SECONDS = 10;
   const BOOST_SECONDS = 3;
-  const GRAVITY = IS_MOBILE_PORTRAIT ? 1840 : 1940;
-  const BASE_SPEED = IS_MOBILE_PORTRAIT ? 390 : 600;
-  const MAX_SPEED = IS_MOBILE_PORTRAIT ? 620 : 900;
-  const BOOST_SPEED = IS_MOBILE_PORTRAIT ? 980 : 1450;
-  const CRASH_SPEED = IS_MOBILE_PORTRAIT ? 300 : 430;
-  const SPEED_ACCELERATION = IS_MOBILE_PORTRAIT ? 35 : 46;
-  const OBSTACLE_VISUAL_SCALE = 1.1;
+  const GRAVITY = 1940;
+  const BASE_SPEED = IS_MOBILE_PORTRAIT ? 520 : 600;
+  const MAX_SPEED = IS_MOBILE_PORTRAIT ? 780 : 900;
+  const BOOST_SPEED = IS_MOBILE_PORTRAIT ? 1250 : 1450;
+  const CRASH_SPEED = IS_MOBILE_PORTRAIT ? 390 : 430;
+  const SPEED_ACCELERATION = IS_MOBILE_PORTRAIT ? 40 : 46;
+  const OBSTACLE_VISUAL_SCALE = IS_MOBILE_PORTRAIT ? 1.3 : 1.1;
+  const VEHICLE_FRAME_RATIO = (1870 / 8) / (841 / 6);
+  const ASSET_VERSION = "1.3.0";
   const paths = {
     root: "./assets/game/",
     ui: "./assets/game/ui/items/",
@@ -210,18 +207,34 @@
   let renderedGauge = "";
 
   function createPlayer() {
-    const width = IS_MOBILE_PORTRAIT ? 212 : 226;
-    const height = IS_MOBILE_PORTRAIT ? 97 : 103;
-    return { x: IS_MOBILE_PORTRAIT ? 42 : 138, y: GROUND_Y - height, w: width, h: height, vy: 0, jumps: 0, hurt: 0, land: 0 };
+    const width = IS_MOBILE_PORTRAIT ? 270 : 226;
+    const height = Math.round(width / VEHICLE_FRAME_RATIO);
+    return { x: IS_MOBILE_PORTRAIT ? 82 : 138, y: GROUND_Y - height, w: width, h: height, vy: 0, jumps: 0, hurt: 0, land: 0 };
   }
 
   function loadImage(key, source) {
     return new Promise((resolve) => {
       const image = new Image();
-      image.onload = () => resolve({ key, image });
+      image.onload = async () => {
+        try { await image.decode(); } catch {}
+        resolve({ key, image });
+      };
       image.onerror = () => resolve({ key, image: null });
-      image.src = paths.root + source;
+      image.src = `${paths.root}${source}?v=${ASSET_VERSION}`;
     });
+  }
+
+  function warmObstacleTextures() {
+    ctx.save();
+    ctx.globalAlpha = .01;
+    for (const stage of stages) {
+      for (const config of stage.obstacles) {
+        const image = assets[config.key];
+        if (!image) continue;
+        ctx.drawImage(image, 0, 0, config.w * OBSTACLE_VISUAL_SCALE, config.h * OBSTACLE_VISUAL_SCALE);
+      }
+    }
+    ctx.restore();
   }
 
   async function preload() {
@@ -234,6 +247,7 @@
     }));
     await Promise.all(tasks);
     if (document.fonts?.ready) await document.fonts.ready;
+    warmObstacleTextures();
     state = "menu";
     ui.loadingScreen.classList.remove("is-visible");
     ui.introScreen.classList.add("is-visible");
@@ -423,7 +437,12 @@
   }
 
   function playerHitbox() {
-    return { x: player.x + 42, y: player.y + 34, w: player.w - 84, h: player.h - 45 };
+    return {
+      x: player.x + player.w * .19,
+      y: player.y + player.h * .32,
+      w: player.w * .62,
+      h: player.h * .53,
+    };
   }
 
   function obstacleHitbox(obstacle) {
@@ -674,7 +693,7 @@
     const intensity = boosting ? 1 : .35 + ((speed - CRASH_SPEED) / (MAX_SPEED - CRASH_SPEED)) * .35;
     const count = boosting ? 20 : 12;
     ctx.fillStyle = boosting ? "#25def1aa" : `rgba(216, 239, 255, ${Math.max(.12, intensity * .32)})`;
-    const lineTop = IS_MOBILE_PORTRAIT ? Math.round(H * .18) : 108;
+    const lineTop = 108;
     const lineRange = Math.max(240, GROUND_Y - lineTop - 18);
     for (let index = 0; index < count; index += 1) {
       const y = lineTop + ((index * 43 + worldDistance * (boosting ? 1.25 : .72)) % lineRange);
@@ -692,7 +711,8 @@
     if (boostTime > 0) {
       const frame = (Math.floor((BOOST_SECONDS - boostTime) * 12) % 6) + 1;
       const shield = assets[`shield${frame}`];
-      if (shield) ctx.drawImage(shield, player.x + player.w / 2 - 102, player.y + player.h / 2 - 102, 204, 204);
+      const shieldSize = IS_MOBILE_PORTRAIT ? 250 : 220;
+      if (shield) ctx.drawImage(shield, player.x + player.w / 2 - shieldSize / 2, player.y + player.h / 2 - shieldSize / 2, shieldSize, shieldSize);
     }
   }
 
@@ -702,11 +722,15 @@
     if (IS_MOBILE_PORTRAIT) {
       const chaseSpeed = boostTime > 0 ? BOOST_SPEED : speed;
       const retreat = Math.max(0, Math.min(55, ((chaseSpeed - BASE_SPEED) / (BOOST_SPEED - BASE_SPEED)) * 55));
-      drawSheetFrame(assets.thiefVehicle, 8, 6, column, row, W - 225 - retreat, GROUND_Y - 86, 190, 86);
+      const width = 240;
+      const height = Math.round(width / VEHICLE_FRAME_RATIO);
+      drawSheetFrame(assets.thiefVehicle, 8, 6, column, row, W - 300 - retreat, GROUND_Y - height, width, height);
       return;
     }
+    const width = 202;
+    const height = Math.round(width / VEHICLE_FRAME_RATIO);
     const drawX = Math.max(885, Math.min(1070, 1005 + (BASE_SPEED - (boostTime > 0 ? 1180 : speed)) * .28));
-    drawSheetFrame(assets.thiefVehicle, 8, 6, column, row, drawX, GROUND_Y - 91, 202, 91);
+    drawSheetFrame(assets.thiefVehicle, 8, 6, column, row, drawX, GROUND_Y - height, width, height);
   }
 
   function drawSheetFrame(image, columns, rows, column, row, x, y, width, height) {
@@ -743,7 +767,7 @@
 
   function drawSpeedReadout() {
     if (!["playing", "paused", "countdown"].includes(state)) return;
-    const displayFactor = IS_MOBILE_PORTRAIT ? .33 : .22;
+    const displayFactor = IS_MOBILE_PORTRAIT ? .25 : .22;
     const kmh = Math.round((boostTime > 0 ? BOOST_SPEED : speed) * displayFactor);
     ctx.fillStyle = "#06152ddd";
     ctx.fillRect(18, H - 58, 178, 37);
