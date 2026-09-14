@@ -2,6 +2,13 @@
   "use strict";
 
   const canvas = document.querySelector("#game");
+  const portraitQuery = window.matchMedia("(orientation: portrait) and (max-width: 820px)");
+  const IS_MOBILE_PORTRAIT = portraitQuery.matches;
+  if (IS_MOBILE_PORTRAIT) {
+    const viewportRatio = window.innerHeight / Math.max(1, window.innerWidth);
+    canvas.width = 720;
+    canvas.height = Math.round(720 * Math.max(1.6, Math.min(2.2, viewportRatio)));
+  }
   const ctx = canvas.getContext("2d", { alpha: false });
   ctx.imageSmoothingEnabled = false;
 
@@ -46,16 +53,16 @@
 
   const W = canvas.width;
   const H = canvas.height;
-  const GROUND_Y = 605;
+  const GROUND_Y = IS_MOBILE_PORTRAIT ? Math.round(H * .84) : 605;
   const STAGE_SECONDS = 30;
   const BOOST_CHARGE_SECONDS = 10;
   const BOOST_SECONDS = 3;
-  const GRAVITY = 1940;
-  const BASE_SPEED = 600;
-  const MAX_SPEED = 900;
-  const BOOST_SPEED = 1450;
-  const CRASH_SPEED = 430;
-  const SPEED_ACCELERATION = 46;
+  const GRAVITY = IS_MOBILE_PORTRAIT ? 1840 : 1940;
+  const BASE_SPEED = IS_MOBILE_PORTRAIT ? 390 : 600;
+  const MAX_SPEED = IS_MOBILE_PORTRAIT ? 620 : 900;
+  const BOOST_SPEED = IS_MOBILE_PORTRAIT ? 980 : 1450;
+  const CRASH_SPEED = IS_MOBILE_PORTRAIT ? 300 : 430;
+  const SPEED_ACCELERATION = IS_MOBILE_PORTRAIT ? 35 : 46;
   const OBSTACLE_VISUAL_SCALE = 1.1;
   const paths = {
     root: "./assets/game/",
@@ -203,7 +210,9 @@
   let renderedGauge = "";
 
   function createPlayer() {
-    return { x: 138, y: GROUND_Y - 103, w: 226, h: 103, vy: 0, jumps: 0, hurt: 0, land: 0 };
+    const width = IS_MOBILE_PORTRAIT ? 212 : 226;
+    const height = IS_MOBILE_PORTRAIT ? 97 : 103;
+    return { x: IS_MOBILE_PORTRAIT ? 42 : 138, y: GROUND_Y - height, w: width, h: height, vy: 0, jumps: 0, hurt: 0, land: 0 };
   }
 
   function loadImage(key, source) {
@@ -408,7 +417,8 @@
       destroyed: false,
     };
     obstacles.push(obstacle);
-    nextObstacleIn = Math.max(1.8, 2.65 - (speed - BASE_SPEED) / 600) + Math.random() * .75;
+    const accelerationRatio = (speed - BASE_SPEED) / Math.max(1, MAX_SPEED - BASE_SPEED);
+    nextObstacleIn = Math.max(1.8, 2.65 - accelerationRatio * .5) + Math.random() * .75;
     thiefThrowTime = .7;
   }
 
@@ -664,8 +674,10 @@
     const intensity = boosting ? 1 : .35 + ((speed - CRASH_SPEED) / (MAX_SPEED - CRASH_SPEED)) * .35;
     const count = boosting ? 20 : 12;
     ctx.fillStyle = boosting ? "#25def1aa" : `rgba(216, 239, 255, ${Math.max(.12, intensity * .32)})`;
+    const lineTop = IS_MOBILE_PORTRAIT ? Math.round(H * .18) : 108;
+    const lineRange = Math.max(240, GROUND_Y - lineTop - 18);
     for (let index = 0; index < count; index += 1) {
-      const y = 108 + ((index * 43 + worldDistance * (boosting ? 1.25 : .72)) % 505);
+      const y = lineTop + ((index * 43 + worldDistance * (boosting ? 1.25 : .72)) % lineRange);
       const length = (boosting ? 105 : 48) + (index % 5) * (boosting ? 36 : 19);
       const x = W - ((worldDistance * (boosting ? 3.1 : 1.75) + index * 137) % (W + 300));
       ctx.fillRect(x, y, length, boosting ? 6 : 3);
@@ -687,6 +699,12 @@
   function drawThief() {
     const row = thiefThrowTime > 0 ? 3 : boostTime > 0 ? 1 : 0;
     const column = Math.floor(worldDistance / 48) % 8;
+    if (IS_MOBILE_PORTRAIT) {
+      const chaseSpeed = boostTime > 0 ? BOOST_SPEED : speed;
+      const retreat = Math.max(0, Math.min(55, ((chaseSpeed - BASE_SPEED) / (BOOST_SPEED - BASE_SPEED)) * 55));
+      drawSheetFrame(assets.thiefVehicle, 8, 6, column, row, W - 225 - retreat, GROUND_Y - 86, 190, 86);
+      return;
+    }
     const drawX = Math.max(885, Math.min(1070, 1005 + (BASE_SPEED - (boostTime > 0 ? 1180 : speed)) * .28));
     drawSheetFrame(assets.thiefVehicle, 8, 6, column, row, drawX, GROUND_Y - 91, 202, 91);
   }
@@ -725,7 +743,8 @@
 
   function drawSpeedReadout() {
     if (!["playing", "paused", "countdown"].includes(state)) return;
-    const kmh = Math.round((boostTime > 0 ? BOOST_SPEED : speed) * .22);
+    const displayFactor = IS_MOBILE_PORTRAIT ? .33 : .22;
+    const kmh = Math.round((boostTime > 0 ? BOOST_SPEED : speed) * displayFactor);
     ctx.fillStyle = "#06152ddd";
     ctx.fillRect(18, H - 58, 178, 37);
     ctx.strokeStyle = "#476c92";
@@ -792,6 +811,8 @@
   document.addEventListener("visibilitychange", () => {
     if (document.hidden && state === "playing") togglePause();
   });
+
+  portraitQuery.addEventListener("change", () => window.location.reload());
 
   window.requestAnimationFrame(loop);
   preload();
