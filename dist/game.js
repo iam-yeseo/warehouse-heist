@@ -3,7 +3,9 @@
 
   const canvas = document.querySelector("#game");
   const portraitQuery = window.matchMedia("(orientation: portrait) and (max-width: 820px)");
+  const compactQuery = window.matchMedia("(max-width: 820px), (max-height: 560px)");
   const IS_MOBILE_PORTRAIT = portraitQuery.matches;
+  const IS_COMPACT_VIEW = compactQuery.matches;
   const ctx = canvas.getContext("2d", { alpha: false });
   ctx.imageSmoothingEnabled = false;
 
@@ -60,7 +62,7 @@
   const SPEED_ACCELERATION = IS_MOBILE_PORTRAIT ? 40 : 46;
   const OBSTACLE_VISUAL_SCALE = IS_MOBILE_PORTRAIT ? 1.3 : 1.1;
   const VEHICLE_FRAME_RATIO = (1870 / 8) / (841 / 6);
-  const ASSET_VERSION = "1.3.0";
+  const ASSET_VERSION = "1.4.0";
   const paths = {
     root: "./assets/game/",
     ui: "./assets/game/ui/items/",
@@ -769,14 +771,17 @@
     if (!["playing", "paused", "countdown"].includes(state)) return;
     const displayFactor = IS_MOBILE_PORTRAIT ? .25 : .22;
     const kmh = Math.round((boostTime > 0 ? BOOST_SPEED : speed) * displayFactor);
+    const panel = IS_COMPACT_VIEW
+      ? { x: 18, y: H - 58, width: 178, height: 37, textX: 31, textY: H - 32 }
+      : { x: 18, y: H - 70, width: 218, height: 49, textX: 35, textY: H - 38 };
     ctx.fillStyle = "#06152ddd";
-    ctx.fillRect(18, H - 58, 178, 37);
+    ctx.fillRect(panel.x, panel.y, panel.width, panel.height);
     ctx.strokeStyle = "#476c92";
     ctx.lineWidth = 3;
-    ctx.strokeRect(18, H - 58, 178, 37);
+    ctx.strokeRect(panel.x, panel.y, panel.width, panel.height);
     ctx.fillStyle = boostTime > 0 ? "#25def1" : "#ffd43d";
     ctx.font = '22px "DOSGothic", monospace';
-    ctx.fillText(`속도 ${kmh} KM/H`, 31, H - 32);
+    ctx.fillText(`속도 ${kmh} KM/H`, panel.textX, panel.textY);
   }
 
   function playTone(frequency, duration, type = "square", volume = .025) {
