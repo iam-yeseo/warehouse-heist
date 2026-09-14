@@ -3,68 +3,128 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-    <meta name="theme-color" content="#171421" />
-    <meta name="description" content="창고에서 탈출한 상품을 잡는 8비트 점프 게임" />
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23171421'/%3E%3Cpath d='M10 22 32 10l22 12v30H10z' fill='%23F27490'/%3E%3Cpath d='M18 30h28v22H18z' fill='%23ffb13b'/%3E%3Cpath d='M26 36h12v16H26z' fill='%23171421'/%3E%3C/svg%3E" />
-    <title>창고 대방출!</title>
-    <link rel="stylesheet" href="./style.css" />
+    <meta name="theme-color" content="#07152c" />
+    <meta name="description" content="도둑을 추격해 창고에서 사라진 상품 3개를 되찾는 8비트 횡스크롤 게임" />
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%2307152c'/%3E%3Cpath d='M9 27h31v22H9z' fill='white' stroke='%230a1830' stroke-width='4'/%3E%3Cpath d='M40 33h12l5 7v9H40z' fill='white' stroke='%230a1830' stroke-width='4'/%3E%3Cpath d='M10 42h46' stroke='%23ff741f' stroke-width='4'/%3E%3Ccircle cx='21' cy='51' r='6' fill='%2329dff2' stroke='%230a1830' stroke-width='4'/%3E%3Ccircle cx='47' cy='51' r='6' fill='%2329dff2' stroke='%230a1830' stroke-width='4'/%3E%3C/svg%3E" />
+    <title>창고 탈환 작전</title>
+    <link rel="preload" href="./assets/game/fonts/DOSGothic.ttf" as="font" type="font/ttf" crossorigin />
+    <link rel="stylesheet" href="./style.css?v=1.0.0" />
   </head>
   <body>
-    <main class="game-shell">
-      <header class="topbar" aria-label="게임 현황">
-        <div class="brand">
-          <span class="brand-mark" aria-hidden="true">BOX</span>
-          <div><strong>창고 대방출!</strong><small>ESCAPE ITEMS</small></div>
-        </div>
-        <div class="stats">
-          <div><span>점수</span><strong id="score">0000</strong></div>
-          <div><span>남은 시간</span><strong id="time">45</strong></div>
-        </div>
-      </header>
-
-      <section class="game-frame" aria-label="창고 대방출 게임">
-        <canvas id="game" width="360" height="640" aria-label="좌우로 움직이고 점프해 상품을 수집하는 게임"></canvas>
+    <main class="game-app">
+      <section class="game-frame" id="gameFrame" aria-label="창고 탈환 작전 게임">
+        <canvas id="game" width="1280" height="720" aria-label="점프와 부스트로 장애물을 피하며 도둑을 추격하는 게임"></canvas>
         <div class="scanlines" aria-hidden="true"></div>
 
-        <div class="overlay is-visible" id="startOverlay">
-          <p class="eyebrow">SEPTEMBER EVENT</p>
-          <h1>도망친 상품을<br /><em>잡아라!</em></h1>
-          <div class="pixel-box" aria-hidden="true"><span>?</span></div>
-          <p class="intro">발판을 밟고 점프해<br />창고를 탈출한 상품을 회수하세요.</p>
-          <div class="key-guide" aria-label="조작 방법">
-            <span><kbd>←</kbd><kbd>→</kbd> 이동</span>
-            <span><kbd>SPACE</kbd> 점프</span>
+        <header class="hud" id="hud" aria-label="게임 현황">
+          <div class="hud-left">
+            <div class="stage-chip">
+              <span id="stageNumber">STAGE 1</span>
+              <strong id="stageName">도심 추격</strong>
+            </div>
+            <div class="lives" id="lives" aria-label="남은 생명 3개"></div>
           </div>
-          <button class="primary-button" id="startButton" type="button">게임 시작</button>
+          <div class="stage-progress" aria-label="스테이지 진행도">
+            <div class="progress-track"><span id="stageProgress"></span></div>
+            <strong><span id="timeLeft">30</span>초</strong>
+          </div>
+          <div class="hud-right">
+            <div class="product-slots" id="productSlots" aria-label="회수한 제품"></div>
+            <div class="boost-status" id="boostStatus">
+              <img id="boostGauge" src="./assets/game/ui/items/boost-gauge-empty.png" alt="부스트 충전 상태" />
+              <span id="boostLabel">0.0 / 10초</span>
+            </div>
+          </div>
+        </header>
+
+        <button class="icon-button pause-button" id="pauseButton" type="button" aria-label="일시정지">
+          <img src="./assets/game/ui/items/button-pause.png" alt="" />
+        </button>
+
+        <div class="mobile-actions" aria-label="게임 조작">
+          <button class="action-button" id="jumpButton" type="button" aria-label="점프, 한 번 더 누르면 더블점프">
+            <img src="./assets/game/ui/items/button-jump.png" alt="" />
+            <span>점프</span>
+          </button>
+          <button class="action-button" id="boostButton" type="button" aria-label="부스트 사용" disabled>
+            <img src="./assets/game/ui/items/button-boost.png" alt="" />
+            <span>부스트</span>
+          </button>
         </div>
 
-        <div class="overlay result" id="resultOverlay" aria-live="polite">
-          <p class="eyebrow">WAREHOUSE REPORT</p>
-          <p class="result-rank" id="resultRank">재고 신입</p>
-          <h2><span id="finalScore">0</span>점</h2>
-          <p id="resultMessage">상품을 더 잡아볼까요?</p>
-          <dl>
-            <div><dt>회수 상품</dt><dd id="finalItems">0개</dd></div>
-            <div><dt>최고 콤보</dt><dd id="finalCombo">0</dd></div>
-          </dl>
-          <button class="primary-button" id="retryButton" type="button">다시 도전</button>
+        <div class="screen loading-screen is-visible" id="loadingScreen" aria-live="polite">
+          <div class="loading-mark" aria-hidden="true">▰▰▰</div>
+          <p>창고 문을 여는 중...</p>
+          <div class="loading-track"><span id="loadingBar"></span></div>
         </div>
 
-        <div class="toast" id="toast" aria-live="polite"></div>
-
-        <div class="mobile-controls" aria-label="모바일 게임 조작">
-          <div class="direction-controls">
-            <button class="control-button" id="leftButton" type="button" aria-label="왼쪽으로 이동">◀</button>
-            <button class="control-button" id="rightButton" type="button" aria-label="오른쪽으로 이동">▶</button>
+        <div class="screen intro-screen" id="introScreen">
+          <div class="screen-shade"></div>
+          <div class="intro-copy">
+            <p class="eyebrow">WAREHOUSE HEIST</p>
+            <h1>창고 탈환<br /><em>작전</em></h1>
+            <p>도둑이 훔쳐 간 상품 3개를 되찾으세요.<br />세 개의 도로 끝에 하나씩 숨겨져 있습니다.</p>
+            <div class="rules">
+              <span><b>SPACE</b> 점프 · 더블점프</span>
+              <span><b>B</b> 10초 무충돌 부스트</span>
+            </div>
+            <button class="pixel-button primary" id="startButton" type="button">추격 시작</button>
           </div>
-          <button class="control-button jump-button" id="jumpButton" type="button" aria-label="점프">JUMP</button>
+        </div>
+
+        <div class="countdown" id="countdown" aria-live="assertive"></div>
+        <div class="notice" id="notice" aria-live="polite"></div>
+
+        <div class="screen stage-clear-screen" id="stageClearScreen">
+          <div class="modal-panel recovery-panel">
+            <p class="eyebrow">ITEM RECOVERED</p>
+            <h2><span id="clearStageLabel">스테이지 1</span> 클리어!</h2>
+            <div class="recovery-visual">
+              <img id="recoveryCase" class="recovery-case" src="./assets/game/effects/recovery/case-01.png" alt="열리는 회수 상자" />
+              <img id="recoveredProduct" class="recovered-product" src="" alt="되찾은 상품" />
+            </div>
+            <strong id="recoveryCount">상품 회수 1 / 3</strong>
+            <button class="pixel-button primary" id="nextStageButton" type="button">다음 추격</button>
+          </div>
+        </div>
+
+        <div class="screen pause-screen" id="pauseScreen">
+          <div class="modal-panel compact-panel">
+            <p class="eyebrow">CHASE PAUSED</p>
+            <h2>잠시 정차!</h2>
+            <button class="pixel-button primary" id="resumeButton" type="button">계속 추격</button>
+            <button class="pixel-button secondary" id="restartButton" type="button">처음부터</button>
+          </div>
+        </div>
+
+        <div class="screen game-over-screen" id="gameOverScreen">
+          <div class="screen-shade"></div>
+          <div class="result-copy">
+            <p class="eyebrow">CHASE FAILED</p>
+            <h2>도둑을 놓쳤어요</h2>
+            <p>회수한 상품 <strong id="failedRecovered">0</strong> / 3</p>
+            <button class="pixel-button primary" id="retryButton" type="button">다시 추격</button>
+          </div>
+        </div>
+
+        <div class="screen victory-screen" id="victoryScreen">
+          <div class="screen-shade light"></div>
+          <div class="victory-copy">
+            <p class="eyebrow">MISSION COMPLETE</p>
+            <h2>모든 상품을 되찾았습니다!</h2>
+            <p>완벽한 창고 탈환 성공</p>
+          </div>
+          <div class="victory-products" id="victoryProducts"></div>
+          <button class="pixel-button primary victory-retry" id="victoryRetryButton" type="button">다시 플레이</button>
         </div>
       </section>
 
-      <footer>
-        <span>← → / A D 이동</span><span>SPACE / W / ↑ 점프</span>
+      <footer class="desktop-guide">
+        <span><kbd>SPACE</kbd> / <kbd>↑</kbd> 점프 · 더블점프</span>
+        <span><kbd>B</kbd> / <kbd>SHIFT</kbd> 부스트</span>
+        <span><kbd>P</kbd> 일시정지</span>
       </footer>
     </main>
-    <script src="./game.js"></script>
+    <script src="./game.js?v=1.0.0"></script>
   </body>
 </html>

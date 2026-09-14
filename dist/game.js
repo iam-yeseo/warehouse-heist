@@ -6,500 +6,703 @@
   ctx.imageSmoothingEnabled = false;
 
   const ui = {
-    score: document.querySelector("#score"),
-    time: document.querySelector("#time"),
-    startOverlay: document.querySelector("#startOverlay"),
-    resultOverlay: document.querySelector("#resultOverlay"),
+    hud: document.querySelector("#hud"),
+    stageNumber: document.querySelector("#stageNumber"),
+    stageName: document.querySelector("#stageName"),
+    lives: document.querySelector("#lives"),
+    stageProgress: document.querySelector("#stageProgress"),
+    timeLeft: document.querySelector("#timeLeft"),
+    productSlots: document.querySelector("#productSlots"),
+    boostStatus: document.querySelector("#boostStatus"),
+    boostGauge: document.querySelector("#boostGauge"),
+    boostLabel: document.querySelector("#boostLabel"),
+    loadingScreen: document.querySelector("#loadingScreen"),
+    loadingBar: document.querySelector("#loadingBar"),
+    introScreen: document.querySelector("#introScreen"),
+    stageClearScreen: document.querySelector("#stageClearScreen"),
+    pauseScreen: document.querySelector("#pauseScreen"),
+    gameOverScreen: document.querySelector("#gameOverScreen"),
+    victoryScreen: document.querySelector("#victoryScreen"),
     startButton: document.querySelector("#startButton"),
+    nextStageButton: document.querySelector("#nextStageButton"),
     retryButton: document.querySelector("#retryButton"),
-    finalScore: document.querySelector("#finalScore"),
-    finalItems: document.querySelector("#finalItems"),
-    finalCombo: document.querySelector("#finalCombo"),
-    resultRank: document.querySelector("#resultRank"),
-    resultMessage: document.querySelector("#resultMessage"),
-    toast: document.querySelector("#toast"),
+    victoryRetryButton: document.querySelector("#victoryRetryButton"),
+    pauseButton: document.querySelector("#pauseButton"),
+    resumeButton: document.querySelector("#resumeButton"),
+    restartButton: document.querySelector("#restartButton"),
+    jumpButton: document.querySelector("#jumpButton"),
+    boostButton: document.querySelector("#boostButton"),
+    countdown: document.querySelector("#countdown"),
+    notice: document.querySelector("#notice"),
+    clearStageLabel: document.querySelector("#clearStageLabel"),
+    recoveryCase: document.querySelector("#recoveryCase"),
+    recoveredProduct: document.querySelector("#recoveredProduct"),
+    recoveryCount: document.querySelector("#recoveryCount"),
+    failedRecovered: document.querySelector("#failedRecovered"),
+    victoryProducts: document.querySelector("#victoryProducts"),
   };
 
   const W = canvas.width;
   const H = canvas.height;
-  const SPRITE_CELL = 362;
-  const GAME_SECONDS = 45;
-  const input = { left: false, right: false, jumpHeld: false, jumpQueued: false };
-  const playerImage = new Image();
-  playerImage.src = "./assets/warehouse-worker.png";
-
-  let state = "menu";
-  let player;
-  let platforms = [];
-  let items = [];
-  let particles = [];
-  let score = 0;
-  let collected = 0;
-  let combo = 0;
-  let maxCombo = 0;
-  let lastCollectAt = -10;
-  let timeLeft = GAME_SECONDS;
-  let elapsed = 0;
-  let lastTime = performance.now();
-  let toastTimer = 0;
-  let platformId = 0;
-
-  const colors = {
-    bg: "#171421",
-    bg2: "#242133",
-    line: "#3a3447",
-    pink: "#f27490",
-    yellow: "#ffcf4a",
-    orange: "#ff8a30",
-    cream: "#fff4d6",
-    navy: "#163657",
+  const GROUND_Y = 605;
+  const STAGE_SECONDS = 30;
+  const BOOST_CHARGE_SECONDS = 10;
+  const BOOST_SECONDS = 3;
+  const GRAVITY = 1940;
+  const paths = {
+    root: "./assets/game/",
+    ui: "./assets/game/ui/items/",
+    effects: "./assets/game/effects/vfx/",
+    recovery: "./assets/game/effects/recovery/",
+    products: "./assets/game/product/",
   };
 
-  function resetGame() {
-    score = 0;
-    collected = 0;
-    combo = 0;
-    maxCombo = 0;
-    lastCollectAt = -10;
-    timeLeft = GAME_SECONDS;
-    elapsed = 0;
-    platformId = 0;
-    particles = [];
-    input.left = false;
-    input.right = false;
-    input.jumpHeld = false;
-    input.jumpQueued = false;
-    player = {
-      x: 154,
-      y: 522,
-      w: 50,
-      h: 58,
-      vx: 0,
-      vy: 0,
-      facing: 1,
-      grounded: true,
-      coyote: .12,
-      jumpBuffer: 0,
-      landing: 0,
-      collectPose: 0,
-      hurt: 0,
-    };
+  const stages = [
+    {
+      name: "도심 추격",
+      palette: "#162342",
+      backgrounds: ["s1bg1", "s1bg2", "s1bg3", "s1bg4"],
+      obstacles: [
+        { key: "s1o1", w: 72, h: 72, kind: "box" },
+        { key: "s1o2", w: 52, h: 76, kind: "cone" },
+        { key: "s1o3", w: 155, h: 88, kind: "barricade" },
+        { key: "s1o4", w: 78, h: 78, kind: "drum", rolling: true },
+        { key: "s1o5", w: 205, h: 60, kind: "gap", low: true },
+      ],
+    },
+    {
+      name: "강변도로",
+      palette: "#0c2d58",
+      backgrounds: ["s2bg"],
+      obstacles: [
+        { key: "s2o1", w: 78, h: 78, kind: "tire", rolling: true },
+        { key: "s2o2", w: 135, h: 78, kind: "cargo" },
+        { key: "s2o3", w: 145, h: 72, kind: "bike" },
+        { key: "s2o4", w: 180, h: 54, kind: "puddle", low: true },
+        { key: "s2o5", w: 220, h: 66, kind: "gap", low: true },
+      ],
+    },
+    {
+      name: "산속 은신처",
+      palette: "#133844",
+      backgrounds: ["s3bg"],
+      obstacles: [
+        { key: "s3o1", w: 88, h: 88, kind: "boulder", rolling: true },
+        { key: "s3o2", w: 165, h: 72, kind: "log" },
+        { key: "s3o3", w: 150, h: 64, kind: "thorns" },
+        { key: "s3o4", w: 180, h: 54, kind: "mud", low: true },
+        { key: "s3o5", w: 230, h: 72, kind: "gap", low: true },
+      ],
+    },
+  ];
 
-    platforms = [
-      makePlatform(104, 580, 152, "floor"),
-      makePlatform(22, 490, 95),
-      makePlatform(188, 421, 110, "belt"),
-      makePlatform(67, 340, 92),
-      makePlatform(219, 266, 104),
-      makePlatform(96, 188, 98, "belt"),
-      makePlatform(10, 112, 88),
-    ];
+  const manifest = {
+    heroVehicle: "hero-vehicle.png",
+    thiefVehicle: "thief-vehicle.png",
+    s1bg1: "stage 1/bg-1.png",
+    s1bg2: "stage 1/bg-2.png",
+    s1bg3: "stage 1/bg-3.png",
+    s1bg4: "stage 1/bg-4.png",
+    s2bg: "stage 2/bg-stage-2.png",
+    s3bg: "stage 3/bg-stage-3.png",
+  };
 
-    items = [
-      makeItem(53, 453, "box"),
-      makeItem(234, 382, "shoe"),
-      makeItem(104, 299, "shirt"),
-      makeItem(270, 225, "box"),
-      makeItem(141, 147, "clock"),
-      makeItem(45, 70, "shoe"),
-    ];
-    syncUI();
+  for (let stage = 1; stage <= 3; stage += 1) {
+    for (let obstacle = 1; obstacle <= 5; obstacle += 1) {
+      const filename = stage === 1 ? `obstacle-${obstacle}.png` : `obstacle-${stage}-${obstacle}.png`;
+      manifest[`s${stage}o${obstacle}`] = `stage ${stage}/${filename}`;
+    }
+  }
+  for (let product = 1; product <= 10; product += 1) manifest[`product${product}`] = `product/product-${product}.png`;
+  for (const group of ["boost", "shield", "dust", "collision", "recovery-sparkle"]) {
+    for (let frame = 1; frame <= 6; frame += 1) {
+      const n = String(frame).padStart(2, "0");
+      manifest[`${group}${frame}`] = `effects/vfx/${group}-${n}.png`;
+    }
+  }
+  for (let frame = 1; frame <= 8; frame += 1) {
+    const n = String(frame).padStart(2, "0");
+    manifest[`case${frame}`] = `effects/recovery/case-${n}.png`;
   }
 
-  function makePlatform(x, y, w, type = "crate") {
-    return { id: platformId++, x, y, w, h: type === "floor" ? 24 : 14, type };
+  const assets = {};
+  let state = "loading";
+  let stageIndex = 0;
+  let stageElapsed = 0;
+  let worldDistance = 0;
+  let speed = 340;
+  let lives = 3;
+  let safeTime = 0;
+  let boostReady = false;
+  let boostTime = 0;
+  let invulnerableTime = 0;
+  let screenShake = 0;
+  let nextObstacleIn = 1.8;
+  let thiefThrowTime = 0;
+  let lastTime = performance.now();
+  let noticeTimer = 0;
+  let recoveryTimer = 0;
+  let audioContext = null;
+  let selectedProducts = [];
+  let recoveredProducts = [];
+  let obstacles = [];
+  let effects = [];
+  let player = createPlayer();
+  let renderedLives = -1;
+  let renderedGauge = "";
+
+  function createPlayer() {
+    return { x: 138, y: GROUND_Y - 103, w: 226, h: 103, vy: 0, jumps: 0, hurt: 0, land: 0 };
   }
 
-  function makeItem(x, y, type) {
-    return { x, y, w: 28, h: 28, type, active: true, bob: Math.random() * Math.PI * 2 };
+  function loadImage(key, source) {
+    return new Promise((resolve) => {
+      const image = new Image();
+      image.onload = () => resolve({ key, image });
+      image.onerror = () => resolve({ key, image: null });
+      image.src = paths.root + source;
+    });
   }
 
-  function startGame() {
-    resetGame();
-    state = "playing";
-    ui.startOverlay.classList.remove("is-visible");
-    ui.resultOverlay.classList.remove("is-visible");
-    lastTime = performance.now();
-    playTone(420, .06, "square", .025);
-    requestAnimationFrame(loop);
+  async function preload() {
+    const entries = Object.entries(manifest);
+    let loaded = 0;
+    const tasks = entries.map(([key, source]) => loadImage(key, source).then((result) => {
+      loaded += 1;
+      ui.loadingBar.style.width = `${Math.round((loaded / entries.length) * 100)}%`;
+      assets[result.key] = result.image;
+    }));
+    await Promise.all(tasks);
+    if (document.fonts?.ready) await document.fonts.ready;
+    state = "menu";
+    ui.loadingScreen.classList.remove("is-visible");
+    ui.introScreen.classList.add("is-visible");
+    prepareProductSlots();
+    updateHud();
   }
 
-  function endGame(reason) {
-    if (state !== "playing") return;
-    state = "ended";
-    input.left = false;
-    input.right = false;
-    const rank = score >= 2200 ? "대방출 히어로" : score >= 1200 ? "재고 달인" : score >= 500 ? "창고 에이스" : "재고 신입";
-    ui.finalScore.textContent = score.toLocaleString("ko-KR");
-    ui.finalItems.textContent = `${collected}개`;
-    ui.finalCombo.textContent = maxCombo;
-    ui.resultRank.textContent = rank;
-    ui.resultMessage.textContent = reason === "fall" ? "발판을 놓쳤어요. 다시 회수해볼까요?" : "제한 시간 동안 열심히 회수했어요!";
-    ui.resultOverlay.classList.add("is-visible");
-    playTone(160, .18, "sawtooth", .03);
+  function prepareProductSlots() {
+    ui.productSlots.replaceChildren();
+    for (let index = 0; index < 3; index += 1) {
+      const slot = document.createElement("span");
+      slot.className = "product-slot";
+      slot.setAttribute("aria-label", `${index + 1}번째 상품 미회수`);
+      ui.productSlots.append(slot);
+    }
+  }
+
+  function chooseProducts() {
+    const pool = Array.from({ length: 10 }, (_, index) => index + 1);
+    for (let index = pool.length - 1; index > 0; index -= 1) {
+      const swap = Math.floor(Math.random() * (index + 1));
+      [pool[index], pool[swap]] = [pool[swap], pool[index]];
+    }
+    return pool.slice(0, 3);
+  }
+
+  function resetCampaign() {
+    stageIndex = 0;
+    lives = 3;
+    selectedProducts = chooseProducts();
+    recoveredProducts = [];
+    prepareProductSlots();
+    hideAllScreens();
+    beginStage(0);
+  }
+
+  function hideAllScreens() {
+    for (const screen of [ui.introScreen, ui.stageClearScreen, ui.pauseScreen, ui.gameOverScreen, ui.victoryScreen]) {
+      screen.classList.remove("is-visible");
+    }
+  }
+
+  function beginStage(index) {
+    stageIndex = index;
+    stageElapsed = 0;
+    worldDistance = 0;
+    speed = 340;
+    safeTime = 0;
+    boostReady = false;
+    boostTime = 0;
+    invulnerableTime = 0;
+    nextObstacleIn = 2.8;
+    thiefThrowTime = 0;
+    obstacles = [];
+    effects = [];
+    player = createPlayer();
+    state = "countdown";
+    hideAllScreens();
+    updateHud();
+    runCountdown();
+  }
+
+  function runCountdown() {
+    let count = 3;
+    ui.countdown.textContent = count;
+    ui.countdown.classList.add("is-visible");
+    playTone(360, .06, "square", .025);
+    const timer = window.setInterval(() => {
+      count -= 1;
+      if (count > 0) {
+        ui.countdown.textContent = count;
+        playTone(360, .06, "square", .025);
+        return;
+      }
+      if (count === 0) {
+        ui.countdown.textContent = "GO!";
+        playTone(620, .1, "square", .03);
+        return;
+      }
+      window.clearInterval(timer);
+      ui.countdown.classList.remove("is-visible");
+      state = "playing";
+      lastTime = performance.now();
+    }, 650);
   }
 
   function queueJump() {
-    if (state !== "playing") return;
-    input.jumpQueued = true;
-    player.jumpBuffer = .13;
+    if (state !== "playing" || player.jumps >= 2) return;
+    player.jumps += 1;
+    player.vy = player.jumps === 1 ? -735 : -655;
+    addEffect("dust", player.x + 78, GROUND_Y - 22, 118, .35);
+    showNotice(player.jumps === 2 ? "더블점프!" : "점프!");
+    playTone(player.jumps === 1 ? 310 : 440, .07, "square", .022);
+  }
+
+  function useBoost() {
+    if (state !== "playing" || !boostReady) return;
+    boostReady = false;
+    safeTime = 0;
+    boostTime = BOOST_SECONDS;
+    invulnerableTime = Math.max(invulnerableTime, BOOST_SECONDS);
+    showNotice("부스트 발동! 장애물 무적");
+    playTone(720, .22, "sawtooth", .035);
+    updateHud();
   }
 
   function update(dt) {
-    elapsed += dt;
-    timeLeft = Math.max(0, GAME_SECONDS - elapsed);
-    if (timeLeft <= 0) return endGame("time");
+    if (state !== "playing") return;
 
-    if (elapsed - lastCollectAt > 1.5 && combo !== 0) combo = 0;
-
-    const acceleration = player.grounded ? 1250 : 760;
-    const target = input.left ? -185 : input.right ? 185 : 0;
-    const delta = target - player.vx;
-    const change = Math.sign(delta) * Math.min(Math.abs(delta), acceleration * dt);
-    player.vx += change;
-    if (input.left) player.facing = -1;
-    if (input.right) player.facing = 1;
-
-    player.jumpBuffer = Math.max(0, player.jumpBuffer - dt);
-    player.coyote = player.grounded ? .12 : Math.max(0, player.coyote - dt);
-    player.landing = Math.max(0, player.landing - dt);
-    player.collectPose = Math.max(0, player.collectPose - dt);
+    stageElapsed += dt;
+    invulnerableTime = Math.max(0, invulnerableTime - dt);
     player.hurt = Math.max(0, player.hurt - dt);
+    player.land = Math.max(0, player.land - dt);
+    thiefThrowTime = Math.max(0, thiefThrowTime - dt);
 
-    if (player.jumpBuffer > 0 && player.coyote > 0) {
-      player.vy = -430;
-      player.grounded = false;
-      player.coyote = 0;
-      player.jumpBuffer = 0;
-      input.jumpQueued = false;
-      playTone(260, .055, "square", .018);
+    if (boostTime > 0) {
+      boostTime = Math.max(0, boostTime - dt);
+      if (boostTime === 0) showNotice("부스트 종료");
+    } else if (!boostReady) {
+      safeTime = Math.min(BOOST_CHARGE_SECONDS, safeTime + dt);
+      if (safeTime >= BOOST_CHARGE_SECONDS) {
+        boostReady = true;
+        showNotice("부스트 준비 완료!");
+        playTone(860, .12, "square", .026);
+      }
     }
 
-    if (!input.jumpHeld && player.vy < -190) player.vy += 900 * dt;
-    player.vy = Math.min(620, player.vy + 1050 * dt);
+    if (boostTime <= 0) speed = Math.min(520, speed + 18 * dt);
+    const worldSpeed = boostTime > 0 ? 880 : speed;
+    worldDistance += worldSpeed * dt;
 
-    const previousBottom = player.y + player.h;
-    player.x += player.vx * dt;
+    player.vy += GRAVITY * dt;
     player.y += player.vy * dt;
-    player.x = Math.max(-4, Math.min(W - player.w + 4, player.x));
-    player.grounded = false;
-
-    if (player.vy >= 0) {
-      for (const platform of platforms) {
-        const nextBottom = player.y + player.h;
-        if (
-          previousBottom <= platform.y + 4 &&
-          nextBottom >= platform.y &&
-          player.x + player.w - 10 > platform.x &&
-          player.x + 10 < platform.x + platform.w
-        ) {
-          player.y = platform.y - player.h;
-          player.vy = 0;
-          player.grounded = true;
-          player.landing = .11;
-          break;
-        }
+    if (player.y >= GROUND_Y - player.h) {
+      if (player.vy > 250) {
+        player.land = .16;
+        addEffect("dust", player.x + 100, GROUND_Y - 15, 145, .38);
       }
+      player.y = GROUND_Y - player.h;
+      player.vy = 0;
+      player.jumps = 0;
     }
 
-    const cameraLine = 242;
-    if (player.y < cameraLine && player.vy < 0) {
-      const shift = cameraLine - player.y;
-      player.y = cameraLine;
-      for (const platform of platforms) platform.y += shift;
-      for (const item of items) item.y += shift;
-      score += Math.floor(shift * .32);
-    }
+    nextObstacleIn -= dt;
+    if (nextObstacleIn <= 0 && stageElapsed < STAGE_SECONDS - 2.3) spawnObstacle();
 
-    platforms = platforms.filter((p) => p.y < H + 70);
-    items = items.filter((item) => item.y < H + 60);
-    generateWorld();
-
-    for (const item of items) {
-      item.bob += dt * 4;
-      if (!item.active) continue;
-      const itemY = item.y + Math.sin(item.bob) * 3;
-      if (overlap(player.x + 7, player.y + 7, player.w - 14, player.h - 10, item.x, itemY, item.w, item.h)) {
-        collectItem(item);
+    for (const obstacle of obstacles) {
+      obstacle.x -= worldSpeed * dt;
+      if (obstacle.rolling) obstacle.angle -= dt * (worldSpeed / 55);
+      if (obstacle.airborne) {
+        obstacle.airPhase += dt * 5;
+        obstacle.y = obstacle.baseY + Math.sin(obstacle.airPhase) * 20;
+        obstacle.angle -= dt * 3.2;
       }
+      if (!obstacle.hit && intersects(playerHitbox(), obstacleHitbox(obstacle))) collide(obstacle);
+    }
+    obstacles = obstacles.filter((obstacle) => obstacle.x + obstacle.w > -80 && !obstacle.destroyed);
+
+    for (const effect of effects) effect.age += dt;
+    effects = effects.filter((effect) => effect.age < effect.duration);
+
+    if (boostTime > 0 && Math.random() < dt * 16) addEffect("boost", player.x - 12, player.y + 52, 145, .35);
+
+    if (stageElapsed >= STAGE_SECONDS) completeStage();
+    updateHud();
+  }
+
+  function spawnObstacle() {
+    const options = stages[stageIndex].obstacles;
+    const config = options[Math.floor(Math.random() * options.length)];
+    const airborne = Boolean(config.airborne && Math.random() < .48);
+    const obstacle = {
+      ...config,
+      x: W + 30,
+      y: airborne ? GROUND_Y - config.h - 105 : GROUND_Y - config.h,
+      baseY: airborne ? GROUND_Y - config.h - 105 : GROUND_Y - config.h,
+      airborne,
+      airPhase: Math.random() * Math.PI,
+      angle: 0,
+      hit: false,
+      destroyed: false,
+    };
+    obstacles.push(obstacle);
+    nextObstacleIn = Math.max(1.6, 2.75 - (speed - 340) / 300) + Math.random() * .85;
+    thiefThrowTime = .7;
+  }
+
+  function playerHitbox() {
+    return { x: player.x + 42, y: player.y + 34, w: player.w - 84, h: player.h - 45 };
+  }
+
+  function obstacleHitbox(obstacle) {
+    const insetX = obstacle.low ? 13 : 9;
+    const insetY = obstacle.low ? 10 : 7;
+    return { x: obstacle.x + insetX, y: obstacle.y + insetY, w: obstacle.w - insetX * 2, h: obstacle.h - insetY };
+  }
+
+  function intersects(a, b) {
+    return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+  }
+
+  function collide(obstacle) {
+    obstacle.hit = true;
+    if (boostTime > 0) {
+      obstacle.destroyed = true;
+      addEffect("collision", obstacle.x + obstacle.w / 2, obstacle.y + obstacle.h / 2, 165, .48);
+      playTone(560, .055, "square", .018);
+      return;
+    }
+    if (invulnerableTime > 0) return;
+    lives -= 1;
+    invulnerableTime = 1.8;
+    player.hurt = .5;
+    screenShake = .36;
+    speed = 255;
+    safeTime = 0;
+    boostReady = false;
+    addEffect("collision", player.x + player.w - 25, player.y + 35, 175, .55);
+    showNotice(`충돌! 생명 ${lives}개`);
+    playTone(120, .18, "sawtooth", .04);
+    if (lives <= 0) endGame();
+  }
+
+  function addEffect(type, x, y, size, duration) {
+    effects.push({ type, x, y, size, duration, age: 0 });
+  }
+
+  function showNotice(message) {
+    ui.notice.textContent = message;
+    ui.notice.classList.add("is-visible");
+    window.clearTimeout(noticeTimer);
+    noticeTimer = window.setTimeout(() => ui.notice.classList.remove("is-visible"), 850);
+  }
+
+  function completeStage() {
+    if (state !== "playing") return;
+    state = "stage-clear";
+    obstacles = [];
+    boostTime = 0;
+    const productNumber = selectedProducts[stageIndex];
+    recoveredProducts.push(productNumber);
+    ui.clearStageLabel.textContent = `스테이지 ${stageIndex + 1}`;
+    ui.recoveryCount.textContent = `상품 회수 ${recoveredProducts.length} / 3`;
+    ui.recoveredProduct.src = `${paths.products}product-${productNumber}.png`;
+    ui.recoveredProduct.classList.remove("is-visible");
+    ui.nextStageButton.textContent = stageIndex === 2 ? "탈환 결과 보기" : "다음 추격";
+    ui.nextStageButton.disabled = true;
+    ui.recoveryCase.src = `${paths.recovery}case-01.png`;
+    ui.stageClearScreen.classList.add("is-visible");
+    updateProductSlots();
+    animateRecovery();
+    playTone(680, .12, "square", .03);
+  }
+
+  function animateRecovery() {
+    window.clearInterval(recoveryTimer);
+    let frame = 1;
+    recoveryTimer = window.setInterval(() => {
+      frame += 1;
+      ui.recoveryCase.src = `${paths.recovery}case-${String(Math.min(frame, 8)).padStart(2, "0")}.png`;
+      if (frame === 6) {
+        ui.recoveredProduct.classList.add("is-visible");
+        playTone(930, .16, "square", .025);
+      }
+      if (frame >= 8) {
+        window.clearInterval(recoveryTimer);
+        ui.nextStageButton.disabled = false;
+      }
+    }, 125);
+  }
+
+  function updateProductSlots() {
+    [...ui.productSlots.children].forEach((slot, index) => {
+      slot.replaceChildren();
+      if (index < recoveredProducts.length) {
+        slot.classList.add("is-filled");
+        const image = document.createElement("img");
+        image.src = `${paths.products}product-${recoveredProducts[index]}.png`;
+        image.alt = `${index + 1}번째 회수 상품`;
+        slot.append(image);
+        slot.setAttribute("aria-label", `${index + 1}번째 상품 회수 완료`);
+      } else {
+        slot.classList.remove("is-filled");
+        slot.setAttribute("aria-label", `${index + 1}번째 상품 미회수`);
+      }
+    });
+  }
+
+  function endGame() {
+    if (state === "game-over") return;
+    state = "game-over";
+    ui.failedRecovered.textContent = recoveredProducts.length;
+    ui.gameOverScreen.classList.add("is-visible");
+    ui.hud.style.opacity = "0";
+    playTone(105, .4, "sawtooth", .035);
+  }
+
+  function showVictory() {
+    state = "victory";
+    ui.stageClearScreen.classList.remove("is-visible");
+    ui.victoryProducts.replaceChildren();
+    for (const productNumber of recoveredProducts) {
+      const image = document.createElement("img");
+      image.src = `${paths.products}product-${productNumber}.png`;
+      image.alt = `회수한 상품 ${productNumber}`;
+      ui.victoryProducts.append(image);
+    }
+    ui.victoryScreen.classList.add("is-visible");
+    ui.hud.style.opacity = "0";
+    playWinJingle();
+  }
+
+  function togglePause() {
+    if (state === "playing") {
+      state = "paused";
+      ui.pauseScreen.classList.add("is-visible");
+    } else if (state === "paused") {
+      state = "playing";
+      ui.pauseScreen.classList.remove("is-visible");
+      lastTime = performance.now();
+    }
+  }
+
+  function updateHud() {
+    ui.hud.style.opacity = ["playing", "paused", "countdown", "stage-clear"].includes(state) ? "1" : "0";
+    ui.stageNumber.textContent = `STAGE ${stageIndex + 1}`;
+    ui.stageName.textContent = stages[stageIndex].name;
+    ui.stageProgress.style.width = `${Math.min(100, (stageElapsed / STAGE_SECONDS) * 100)}%`;
+    ui.timeLeft.textContent = String(Math.max(0, Math.ceil(STAGE_SECONDS - stageElapsed)));
+    if (renderedLives !== lives) {
+      renderedLives = lives;
+      ui.lives.replaceChildren();
+      for (let index = 0; index < 3; index += 1) {
+        const image = document.createElement("img");
+        image.src = `${paths.ui}${index < lives ? "heart-full" : "heart-empty"}.png`;
+        image.alt = "";
+        ui.lives.append(image);
+      }
+      ui.lives.setAttribute("aria-label", `남은 생명 ${lives}개`);
     }
 
-    for (const particle of particles) {
-      particle.x += particle.vx * dt;
-      particle.y += particle.vy * dt;
-      particle.vy += 220 * dt;
-      particle.life -= dt;
+    let gauge = "boost-gauge-empty";
+    if (boostReady || boostTime > 0) gauge = "boost-gauge-ready";
+    else if (safeTime > 0) gauge = "boost-gauge-charging";
+    if (gauge !== renderedGauge) {
+      renderedGauge = gauge;
+      ui.boostGauge.src = `${paths.ui}${gauge}.png`;
     }
-    particles = particles.filter((particle) => particle.life > 0);
-
-    if (player.y > H + 45) endGame("fall");
-    syncUI();
-  }
-
-  function generateWorld() {
-    let highest = Math.min(...platforms.map((p) => p.y));
-    while (highest > -50) {
-      const gap = 68 + Math.random() * 25;
-      const width = 78 + Math.random() * 42;
-      const x = 12 + Math.random() * (W - width - 24);
-      highest -= gap;
-      const type = Math.random() < .22 ? "belt" : "crate";
-      platforms.push(makePlatform(x, highest, width, type));
-      const roll = Math.random();
-      const itemType = roll < .11 ? "clock" : roll < .55 ? "box" : roll < .78 ? "shoe" : "shirt";
-      items.push(makeItem(x + width / 2 - 14, highest - 37, itemType));
-    }
-  }
-
-  function collectItem(item) {
-    item.active = false;
-    combo = elapsed - lastCollectAt <= 1.5 ? combo + 1 : 1;
-    maxCombo = Math.max(maxCombo, combo);
-    lastCollectAt = elapsed;
-    collected += 1;
-    const base = item.type === "clock" ? 250 : 100;
-    const gained = base * Math.min(combo, 5);
-    score += gained;
-    player.collectPose = .18;
-    if (item.type === "clock") elapsed = Math.max(0, elapsed - 3);
-    showToast(item.type === "clock" ? `TIME +3 · +${gained}` : combo > 1 ? `${combo} COMBO · +${gained}` : `GET! +${gained}`);
-    burst(item.x + 14, item.y + 14, item.type === "clock" ? colors.yellow : colors.pink);
-    playTone(item.type === "clock" ? 760 : 560 + combo * 45, .07, "square", .022);
-  }
-
-  function burst(x, y, color) {
-    for (let i = 0; i < 9; i++) {
-      particles.push({ x, y, vx: (Math.random() - .5) * 150, vy: -40 - Math.random() * 100, life: .45 + Math.random() * .25, color });
-    }
-  }
-
-  function showToast(text) {
-    ui.toast.textContent = text;
-    ui.toast.classList.add("show");
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => ui.toast.classList.remove("show"), 650);
-  }
-
-  function overlap(ax, ay, aw, ah, bx, by, bw, bh) {
-    return ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by;
-  }
-
-  function syncUI() {
-    ui.score.textContent = String(score).padStart(4, "0");
-    ui.time.textContent = String(Math.ceil(timeLeft)).padStart(2, "0");
-    ui.time.style.color = timeLeft <= 10 ? colors.pink : colors.yellow;
+    if (boostTime > 0) ui.boostLabel.textContent = `부스트 ${boostTime.toFixed(1)}초`;
+    else if (boostReady) ui.boostLabel.textContent = "사용 가능!";
+    else ui.boostLabel.textContent = `${safeTime.toFixed(1)} / 10초`;
+    ui.boostStatus.classList.toggle("is-ready", boostReady);
+    ui.boostButton.disabled = !boostReady || state !== "playing";
+    ui.boostButton.classList.toggle("is-ready", boostReady && state === "playing");
   }
 
   function draw() {
+    ctx.save();
+    if (screenShake > 0 && state === "playing") {
+      screenShake = Math.max(0, screenShake - 1 / 60);
+      ctx.translate((Math.random() - .5) * 12, (Math.random() - .5) * 8);
+    }
     drawBackground();
-    drawPlatforms();
-    drawItems();
-    drawParticles();
+    drawSpeedLines();
+    drawThief();
+    drawObstacles();
+    drawEffects();
     drawPlayer();
+    drawSpeedReadout();
+    ctx.restore();
   }
 
   function drawBackground() {
-    const gradient = ctx.createLinearGradient(0, 0, 0, H);
-    gradient.addColorStop(0, colors.bg2);
-    gradient.addColorStop(1, colors.bg);
-    ctx.fillStyle = gradient;
+    ctx.fillStyle = stages[stageIndex].palette;
     ctx.fillRect(0, 0, W, H);
-
-    ctx.fillStyle = "#201c2a";
-    for (let x = 0; x < W; x += 90) ctx.fillRect(x + 5, 0, 10, H);
-    ctx.fillStyle = colors.line;
-    for (let y = -20; y < H; y += 96) {
-      ctx.fillRect(0, y, W, 3);
-      for (let x = 20; x < W; x += 110) ctx.fillRect(x, y - 29, 46, 3);
+    if (stageIndex === 0) {
+      drawRepeating(assets.s1bg1, worldDistance * .06);
+      drawRepeating(assets.s1bg2, worldDistance * .16);
+      drawRepeating(assets.s1bg3, worldDistance * .3);
+      drawRepeating(assets.s1bg4, worldDistance * .58);
+    } else {
+      drawRepeating(stageIndex === 1 ? assets.s2bg : assets.s3bg, worldDistance * .28);
     }
-
-    ctx.fillStyle = "rgba(242,116,144,.07)";
-    ctx.beginPath();
-    ctx.moveTo(140, 0);
-    ctx.lineTo(300, H);
-    ctx.lineTo(350, H);
-    ctx.lineTo(220, 0);
-    ctx.fill();
+    const roadShade = ctx.createLinearGradient(0, GROUND_Y - 90, 0, H);
+    roadShade.addColorStop(0, "#06132900");
+    roadShade.addColorStop(1, "#02071188");
+    ctx.fillStyle = roadShade;
+    ctx.fillRect(0, GROUND_Y - 90, W, H - GROUND_Y + 90);
   }
 
-  function drawPlatforms() {
-    for (const p of platforms) {
-      if (p.type === "floor") {
-        ctx.fillStyle = "#34303e";
-        ctx.fillRect(p.x, p.y, p.w, p.h);
-        ctx.fillStyle = colors.yellow;
-        for (let x = p.x; x < p.x + p.w; x += 18) ctx.fillRect(x, p.y, 9, 5);
-        continue;
-      }
-      if (p.type === "belt") {
-        ctx.fillStyle = "#0e0c13";
-        ctx.fillRect(p.x - 3, p.y - 2, p.w + 6, p.h + 5);
-        ctx.fillStyle = "#747080";
-        ctx.fillRect(p.x, p.y, p.w, p.h);
-        ctx.fillStyle = "#302c3a";
-        for (let x = p.x + 6; x < p.x + p.w - 4; x += 17) {
-          ctx.beginPath(); ctx.arc(x, p.y + 7, 4, 0, Math.PI * 2); ctx.fill();
-        }
-      } else {
-        ctx.fillStyle = "#0d0b11";
-        ctx.fillRect(p.x - 3, p.y - 3, p.w + 6, p.h + 6);
-        ctx.fillStyle = "#a95b2b";
-        ctx.fillRect(p.x, p.y, p.w, p.h);
-        ctx.fillStyle = "#d98643";
-        ctx.fillRect(p.x + 4, p.y + 3, p.w - 8, 4);
-        ctx.fillStyle = "#6e371f";
-        ctx.fillRect(p.x + p.w / 2 - 2, p.y, 4, p.h);
-      }
-    }
+  function drawRepeating(image, offset) {
+    if (!image) return;
+    const drawHeight = H;
+    const drawWidth = image.width * (drawHeight / image.height);
+    const wrapped = ((offset % drawWidth) + drawWidth) % drawWidth;
+    for (let x = -wrapped; x < W + drawWidth; x += drawWidth) ctx.drawImage(image, x, 0, drawWidth, drawHeight);
   }
 
-  function drawItems() {
-    for (const item of items) {
-      if (!item.active) continue;
-      const y = Math.round(item.y + Math.sin(item.bob) * 3);
-      ctx.save();
-      ctx.translate(Math.round(item.x), y);
-      ctx.fillStyle = "rgba(255,207,74,.16)";
-      ctx.fillRect(-4, -4, 36, 36);
-      ctx.fillStyle = "#0c0a10";
-      ctx.fillRect(2, 2, 24, 24);
-      if (item.type === "box") {
-        ctx.fillStyle = colors.orange; ctx.fillRect(4, 5, 20, 19);
-        ctx.fillStyle = "#ffc078"; ctx.fillRect(7, 7, 14, 4);
-        ctx.fillStyle = "#a64d23"; ctx.fillRect(13, 5, 3, 19);
-      } else if (item.type === "shoe") {
-        ctx.fillStyle = colors.pink; ctx.fillRect(6, 9, 8, 10); ctx.fillRect(12, 15, 11, 7);
-        ctx.fillStyle = "white"; ctx.fillRect(7, 20, 17, 3);
-      } else if (item.type === "shirt") {
-        ctx.fillStyle = "#55c6d7"; ctx.fillRect(8, 7, 12, 17); ctx.fillRect(4, 9, 20, 7);
-        ctx.fillStyle = colors.bg; ctx.fillRect(12, 7, 4, 4);
-      } else {
-        ctx.fillStyle = colors.yellow;
-        ctx.beginPath(); ctx.arc(14, 14, 10, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = colors.bg; ctx.fillRect(13, 7, 2, 8); ctx.fillRect(14, 13, 5, 2);
-      }
-      ctx.restore();
+  function drawSpeedLines() {
+    if (boostTime <= 0) return;
+    ctx.fillStyle = "#25def199";
+    for (let index = 0; index < 13; index += 1) {
+      const y = 125 + ((index * 47 + worldDistance * .8) % 480);
+      const length = 70 + (index % 4) * 32;
+      const x = (W - ((worldDistance * 2.2 + index * 133) % (W + 220)));
+      ctx.fillRect(x, y, length, 5);
     }
   }
 
   function drawPlayer() {
-    if (!playerImage.complete || !playerImage.naturalWidth) {
-      ctx.fillStyle = colors.pink;
-      ctx.fillRect(player.x + 8, player.y + 6, player.w - 16, player.h - 6);
-      return;
+    const row = player.hurt > 0 ? 5 : boostTime > 0 ? 2 : player.jumps > 0 ? (player.jumps === 2 ? 4 : 3) : 0;
+    const column = Math.floor(worldDistance / (boostTime > 0 ? 38 : 55)) % 8;
+    const flicker = invulnerableTime > 0 && boostTime <= 0 && Math.floor(invulnerableTime * 14) % 2 === 0;
+    if (!flicker) drawSheetFrame(assets.heroVehicle, 8, 6, column, row, player.x, player.y, player.w, player.h);
+    if (boostTime > 0) {
+      const frame = (Math.floor((BOOST_SECONDS - boostTime) * 12) % 6) + 1;
+      const shield = assets[`shield${frame}`];
+      if (shield) ctx.drawImage(shield, player.x + player.w / 2 - 102, player.y + player.h / 2 - 102, 204, 204);
     }
-    let frame = 0;
-    if (player.hurt > 0) frame = 10;
-    else if (player.collectPose > 0) frame = 9;
-    else if (player.landing > 0) frame = 7;
-    else if (player.vy < -70) frame = 4;
-    else if (player.vy > 70) frame = 6;
-    else if (Math.abs(player.vx) > 30) frame = Math.floor(elapsed * 8) % 2;
-    else frame = Math.floor(elapsed * 3) % 2;
-
-    const sx = (frame % 4) * SPRITE_CELL;
-    const sy = Math.floor(frame / 4) * SPRITE_CELL;
-    ctx.save();
-    if (player.facing < 0) {
-      ctx.translate(Math.round(player.x + player.w), 0);
-      ctx.scale(-1, 1);
-      ctx.drawImage(playerImage, sx, sy, SPRITE_CELL, SPRITE_CELL, 0, Math.round(player.y - 2), player.w, player.h + 4);
-    } else {
-      ctx.drawImage(playerImage, sx, sy, SPRITE_CELL, SPRITE_CELL, Math.round(player.x), Math.round(player.y - 2), player.w, player.h + 4);
-    }
-    ctx.restore();
   }
 
-  function drawParticles() {
-    for (const p of particles) {
-      ctx.globalAlpha = Math.max(0, p.life * 2);
-      ctx.fillStyle = p.color;
-      ctx.fillRect(Math.round(p.x), Math.round(p.y), 5, 5);
+  function drawThief() {
+    const row = thiefThrowTime > 0 ? 3 : boostTime > 0 ? 1 : 0;
+    const column = Math.floor(worldDistance / 62) % 8;
+    const drawX = Math.max(885, Math.min(1070, 1005 + (340 - (boostTime > 0 ? 720 : speed)) * .42));
+    drawSheetFrame(assets.thiefVehicle, 8, 6, column, row, drawX, GROUND_Y - 91, 202, 91);
+  }
+
+  function drawSheetFrame(image, columns, rows, column, row, x, y, width, height) {
+    if (!image) return;
+    const sw = image.width / columns;
+    const sh = image.height / rows;
+    ctx.drawImage(image, column * sw, row * sh, sw, sh, x, y, width, height);
+  }
+
+  function drawObstacles() {
+    for (const obstacle of obstacles) {
+      const image = assets[obstacle.key];
+      if (!image) continue;
+      ctx.save();
+      ctx.translate(obstacle.x + obstacle.w / 2, obstacle.y + obstacle.h / 2);
+      if (obstacle.rolling || obstacle.airborne) ctx.rotate(obstacle.angle);
+      ctx.drawImage(image, -obstacle.w / 2, -obstacle.h / 2, obstacle.w, obstacle.h);
+      ctx.restore();
     }
-    ctx.globalAlpha = 1;
+  }
+
+  function drawEffects() {
+    for (const effect of effects) {
+      const progress = Math.min(.999, effect.age / effect.duration);
+      const frame = Math.min(6, Math.floor(progress * 6) + 1);
+      const image = assets[`${effect.type}${frame}`];
+      if (!image) continue;
+      ctx.globalAlpha = Math.max(0, 1 - Math.max(0, progress - .76) / .24);
+      ctx.drawImage(image, effect.x - effect.size / 2, effect.y - effect.size / 2, effect.size, effect.size);
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  function drawSpeedReadout() {
+    if (!["playing", "paused", "countdown"].includes(state)) return;
+    const kmh = Math.round((boostTime > 0 ? 880 : speed) * .22);
+    ctx.fillStyle = "#06152ddd";
+    ctx.fillRect(18, H - 58, 178, 37);
+    ctx.strokeStyle = "#476c92";
+    ctx.lineWidth = 3;
+    ctx.strokeRect(18, H - 58, 178, 37);
+    ctx.fillStyle = boostTime > 0 ? "#25def1" : "#ffd43d";
+    ctx.font = '22px "DOSGothic", monospace';
+    ctx.fillText(`속도 ${kmh} KM/H`, 31, H - 32);
+  }
+
+  function playTone(frequency, duration, type = "square", volume = .025) {
+    try {
+      audioContext ??= new (window.AudioContext || window.webkitAudioContext)();
+      if (audioContext.state === "suspended") audioContext.resume();
+      const oscillator = audioContext.createOscillator();
+      const gain = audioContext.createGain();
+      oscillator.type = type;
+      oscillator.frequency.value = frequency;
+      gain.gain.setValueAtTime(volume, audioContext.currentTime);
+      gain.gain.exponentialRampToValueAtTime(.0001, audioContext.currentTime + duration);
+      oscillator.connect(gain).connect(audioContext.destination);
+      oscillator.start();
+      oscillator.stop(audioContext.currentTime + duration);
+    } catch (_) {
+      // Audio is optional; gameplay remains fully functional when unavailable.
+    }
+  }
+
+  function playWinJingle() {
+    [520, 660, 780, 1040].forEach((tone, index) => window.setTimeout(() => playTone(tone, .15, "square", .024), index * 125));
   }
 
   function loop(now) {
-    if (state !== "playing") {
-      draw();
-      return;
-    }
-    const dt = Math.min(.033, (now - lastTime) / 1000);
+    const dt = Math.min(.034, Math.max(0, (now - lastTime) / 1000));
     lastTime = now;
     update(dt);
     draw();
-    if (state === "playing") requestAnimationFrame(loop);
+    window.requestAnimationFrame(loop);
   }
 
-  function playTone(frequency, duration, type, volume) {
-    try {
-      const AudioContext = window.AudioContext || window.webkitAudioContext;
-      if (!AudioContext) return;
-      playTone.context ||= new AudioContext();
-      const audio = playTone.context;
-      const osc = audio.createOscillator();
-      const gain = audio.createGain();
-      osc.type = type;
-      osc.frequency.value = frequency;
-      gain.gain.setValueAtTime(volume, audio.currentTime);
-      gain.gain.exponentialRampToValueAtTime(.001, audio.currentTime + duration);
-      osc.connect(gain).connect(audio.destination);
-      osc.start();
-      osc.stop(audio.currentTime + duration);
-    } catch (_) {}
-  }
+  ui.startButton.addEventListener("click", () => { playTone(460, .07); resetCampaign(); });
+  ui.nextStageButton.addEventListener("click", () => stageIndex === 2 ? showVictory() : beginStage(stageIndex + 1));
+  ui.retryButton.addEventListener("click", resetCampaign);
+  ui.victoryRetryButton.addEventListener("click", resetCampaign);
+  ui.pauseButton.addEventListener("click", togglePause);
+  ui.resumeButton.addEventListener("click", togglePause);
+  ui.restartButton.addEventListener("click", resetCampaign);
+  ui.jumpButton.addEventListener("pointerdown", (event) => { event.preventDefault(); queueJump(); });
+  ui.boostButton.addEventListener("pointerdown", (event) => { event.preventDefault(); useBoost(); });
 
-  const movementKeys = {
-    ArrowLeft: "left", KeyA: "left", ArrowRight: "right", KeyD: "right",
-  };
   window.addEventListener("keydown", (event) => {
-    if (["ArrowLeft", "ArrowRight", "ArrowUp", "Space", "KeyA", "KeyD", "KeyW"].includes(event.code)) event.preventDefault();
-    if (movementKeys[event.code]) input[movementKeys[event.code]] = true;
-    if (["ArrowUp", "Space", "KeyW"].includes(event.code) && !event.repeat) {
-      input.jumpHeld = true;
-      queueJump();
-    }
-  }, { passive: false });
-  window.addEventListener("keyup", (event) => {
-    if (movementKeys[event.code]) input[movementKeys[event.code]] = false;
-    if (["ArrowUp", "Space", "KeyW"].includes(event.code)) input.jumpHeld = false;
-  });
-
-  function bindHold(button, property, onDown) {
-    const activePointers = new Set();
-    button.addEventListener("pointerdown", (event) => {
+    if (["Space", "ArrowUp", "KeyW"].includes(event.code)) {
       event.preventDefault();
-      button.setPointerCapture(event.pointerId);
-      activePointers.add(event.pointerId);
-      input[property] = true;
-      button.classList.add("is-pressed");
-      if (onDown) onDown();
-    });
-    const release = (event) => {
-      activePointers.delete(event.pointerId);
-      if (activePointers.size === 0) {
-        input[property] = false;
-        button.classList.remove("is-pressed");
-      }
-    };
-    button.addEventListener("pointerup", release);
-    button.addEventListener("pointercancel", release);
-    button.addEventListener("lostpointercapture", release);
-  }
-
-  bindHold(document.querySelector("#leftButton"), "left");
-  bindHold(document.querySelector("#rightButton"), "right");
-  bindHold(document.querySelector("#jumpButton"), "jumpHeld", queueJump);
-
-  ui.startButton.addEventListener("click", startGame);
-  ui.retryButton.addEventListener("click", startGame);
-  window.addEventListener("blur", () => {
-    input.left = false;
-    input.right = false;
-    input.jumpHeld = false;
+      if (!event.repeat) queueJump();
+    }
+    if (["KeyB", "ShiftLeft", "ShiftRight"].includes(event.code)) {
+      event.preventDefault();
+      if (!event.repeat) useBoost();
+    }
+    if (["KeyP", "Escape"].includes(event.code) && !event.repeat) togglePause();
+    if (event.code === "Enter" && state === "menu") resetCampaign();
   });
 
-  resetGame();
-  playerImage.addEventListener("load", draw);
-  draw();
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden && state === "playing") togglePause();
+  });
+
+  window.requestAnimationFrame(loop);
+  preload();
 })();
