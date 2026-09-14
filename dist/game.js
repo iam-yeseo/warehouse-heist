@@ -62,7 +62,7 @@
   const SPEED_ACCELERATION = IS_MOBILE_PORTRAIT ? 40 : 46;
   const OBSTACLE_VISUAL_SCALE = IS_MOBILE_PORTRAIT ? 1.3 : 1.1;
   const VEHICLE_FRAME_RATIO = (1870 / 8) / (841 / 6);
-  const ASSET_VERSION = "1.5.0";
+  const ASSET_VERSION = "1.6.0";
   const paths = {
     root: "./assets/game/",
     ui: "./assets/game/ui/items/",
@@ -81,7 +81,7 @@
         { key: "s1o2", w: 52, h: 76, kind: "cone" },
         { key: "s1o3", w: 155, h: 88, kind: "barricade" },
         { key: "s1o4", w: 78, h: 78, kind: "drum", rolling: true },
-        { key: "s1o5", w: 205, h: 60, kind: "gap", low: true },
+        { key: "s1o5", w: 500, h: 150, kind: "manhole", terrain: true, surfaceStart: .35, surfaceEnd: .65 },
       ],
     },
     {
@@ -92,8 +92,8 @@
         { key: "s2o1", w: 78, h: 78, kind: "tire", rolling: true },
         { key: "s2o2", w: 135, h: 78, kind: "cargo" },
         { key: "s2o3", w: 145, h: 72, kind: "bike" },
-        { key: "s2o4", w: 180, h: 54, kind: "puddle", low: true },
-        { key: "s2o5", w: 220, h: 66, kind: "gap", low: true },
+        { key: "s2o4", w: 520, h: 160, kind: "puddle", terrain: true, surfaceStart: .12, surfaceEnd: .88 },
+        { key: "s2o5", w: 680, h: 190, kind: "gap", terrain: true, surfaceStart: .35, surfaceEnd: .65 },
       ],
     },
     {
@@ -104,8 +104,8 @@
         { key: "s3o1", w: 88, h: 88, kind: "boulder", rolling: true },
         { key: "s3o2", w: 165, h: 72, kind: "log" },
         { key: "s3o3", w: 150, h: 64, kind: "thorns" },
-        { key: "s3o4", w: 180, h: 54, kind: "mud", low: true },
-        { key: "s3o5", w: 230, h: 72, kind: "gap", low: true },
+        { key: "s3o4", w: 560, h: 170, kind: "mud", terrain: true, surfaceStart: .12, surfaceEnd: .88 },
+        { key: "s3o5", w: 700, h: 200, kind: "gap", terrain: true, surfaceStart: .35, surfaceEnd: .65 },
       ],
     },
   ];
@@ -259,6 +259,8 @@
   let selectedProducts = [];
   let recoveredProducts = [];
   let obstacles = [];
+  let spawnedHazards = 0;
+  let surfaceKind = "";
   let effects = [];
   let player = createPlayer();
   let renderedLives = -1;
@@ -267,7 +269,7 @@
   function createPlayer() {
     const width = IS_MOBILE_PORTRAIT ? 230 : 226;
     const height = Math.round(width / VEHICLE_FRAME_RATIO);
-    return { x: IS_MOBILE_PORTRAIT ? 45 : 138, y: GROUND_Y - height, w: width, h: height, vy: 0, jumps: 0, hurt: 0, land: 0 };
+    return { x: IS_MOBILE_PORTRAIT ? 45 : 138, y: GROUND_Y - height, w: width, h: height, vy: 0, jumps: 0, hurt: 0, land: 0, fallTime: 0 };
   }
 
   function loadImage(key, source) {
@@ -392,6 +394,8 @@
     nextObstacleIn = 2.8;
     thiefThrowTime = 0;
     obstacles = [];
+    spawnedHazards = 0;
+    surfaceKind = "";
     effects = [];
     player = createPlayer();
     state = "countdown";
@@ -426,7 +430,7 @@
   }
 
   function queueJump() {
-    if (state !== "playing" || player.jumps >= 2) return;
+    if (state !== "playing" || player.jumps >= 2 || player.fallTime > 0) return;
     player.jumps += 1;
     player.vy = player.jumps === 1 ? -735 : -655;
     addEffect("dust", player.x + 78, GROUND_Y - 22, 118, .35);
@@ -468,12 +472,30 @@
     }
 
     if (boostTime <= 0) speed = Math.min(MAX_SPEED, speed + SPEED_ACCELERATION * dt);
-    const worldSpeed = boostTime > 0 ? BOOST_SPEED : speed;
+    surfaceKind = "";
+    const surface = obstacles.find(obstacle => obstacle.terrain && ["mud", "puddle"].includes(obstacle.kind) && touchesTerrain(obstacle));
+    if (surface && boostTime <= 0 && player.fallTime <= 0) {
+      surfaceKind = surface.kind;
+      if (!surface.hit) {
+        surface.hit = true;
+        showNotice(surface.kind === "mud" ? "진흙길! 점프로 빠져나오세요" : "물웅덩이! 속도가 줄어들어요");
+      }
+    }
+    const terrainDrag = surfaceKind === "mud" ? .52 : surfaceKind === "puddle" ? .72 : 1;
+    const worldSpeed = boostTime > 0 ? BOOST_SPEED : speed * terrainDrag;
     worldDistance += worldSpeed * dt;
 
+    if (player.fallTime > 0) {
+      player.fallTime = Math.max(0, player.fallTime - dt);
+      if (player.fallTime === 0) {
+        player.y = GROUND_Y - player.h;
+        player.vy = 0;
+        player.jumps = 0;
+      }
+    }
     player.vy += GRAVITY * dt;
     player.y += player.vy * dt;
-    if (player.y >= GROUND_Y - player.h) {
+    if (player.fallTime <= 0 && player.y >= GROUND_Y - player.h) {
       if (player.vy > 250) {
         player.land = .16;
         addEffect("dust", player.x + 100, GROUND_Y - 15, 145, .38);
@@ -494,7 +516,9 @@
         obstacle.y = obstacle.baseY + Math.sin(obstacle.airPhase) * 20;
         obstacle.angle -= dt * 3.2;
       }
-      if (!obstacle.hit && intersects(playerHitbox(), obstacleHitbox(obstacle))) collide(obstacle);
+      if (obstacle.terrain) {
+        if (["gap", "manhole"].includes(obstacle.kind) && !obstacle.hit && touchesTerrain(obstacle)) collide(obstacle);
+      } else if (!obstacle.hit && intersects(playerHitbox(), obstacleHitbox(obstacle))) collide(obstacle);
     }
     obstacles = obstacles.filter((obstacle) => obstacle.x + obstacle.w > -80 && !obstacle.destroyed);
 
@@ -509,7 +533,12 @@
 
   function spawnObstacle() {
     const options = stages[stageIndex].obstacles;
-    const config = options[Math.floor(Math.random() * options.length)];
+    // Alternate props and road sections so every stage visibly contains its terrain.
+    const terrain = options.filter(option => option.terrain);
+    const props = options.filter(option => !option.terrain);
+    const isRoadSection = spawnedHazards % 2 === 1;
+    const config = isRoadSection ? terrain[Math.floor(spawnedHazards / 2) % terrain.length] : props[Math.floor(Math.random() * props.length)];
+    spawnedHazards += 1;
     const airborne = Boolean(config.airborne && Math.random() < .48);
     const obstacle = {
       ...config,
@@ -525,7 +554,18 @@
     obstacles.push(obstacle);
     const accelerationRatio = (speed - BASE_SPEED) / Math.max(1, MAX_SPEED - BASE_SPEED);
     nextObstacleIn = Math.max(1.8, 2.65 - accelerationRatio * .5) + Math.random() * .75;
-    thiefThrowTime = .7;
+    if (config.terrain) nextObstacleIn += config.w / Math.max(CRASH_SPEED, speed);
+    thiefThrowTime = config.terrain ? 0 : .7;
+  }
+
+  function terrainBounds(obstacle) {
+    return {left: obstacle.x + obstacle.w * obstacle.surfaceStart, right: obstacle.x + obstacle.w * obstacle.surfaceEnd};
+  }
+
+  function touchesTerrain(obstacle) {
+    const {left, right} = terrainBounds(obstacle);
+    const wheelContact = player.x + player.w * .5;
+    return wheelContact > left && wheelContact < right && player.y + player.h >= GROUND_Y - 12 && player.fallTime <= 0;
   }
 
   function playerHitbox() {
@@ -550,6 +590,7 @@
   function collide(obstacle) {
     obstacle.hit = true;
     if (boostTime > 0) {
+      if (obstacle.terrain) return;
       obstacle.destroyed = true;
       addEffect("collision", obstacle.x + obstacle.w / 2, obstacle.y + obstacle.h / 2, 165, .48);
       playTone(560, .055, "square", .018);
@@ -564,7 +605,11 @@
     safeTime = 0;
     boostReady = false;
     addEffect("collision", player.x + player.w - 25, player.y + 35, 175, .55);
-    showNotice(`충돌! 생명 ${lives}개`);
+    if (obstacle.terrain) {
+      player.fallTime = .48;
+      player.vy = 180;
+      showNotice(`도로 이탈! 생명 ${lives}개`);
+    } else showNotice(`충돌! 생명 ${lives}개`);
     playTone(120, .18, "sawtooth", .04);
     if (lives <= 0) endGame();
   }
@@ -729,6 +774,7 @@
       ctx.translate((Math.random() - .5) * 12, (Math.random() - .5) * 8);
     }
     drawBackground();
+    drawTerrain();
     if (!reducedMotion.matches) drawSpeedLines();
     drawThief();
     drawObstacles();
@@ -745,11 +791,11 @@
       drawRepeating(assets.s1bg1, worldDistance * .1);
       drawRepeating(assets.s1bg2, worldDistance * .3);
       drawRepeating(assets.s1bg3, worldDistance * .62);
-      drawRepeating(assets.s1bg4, worldDistance * 1.18);
+      drawRepeating(assets.s1bg4, worldDistance);
     } else if (stageIndex === 1) {
-      drawBandedParallax(assets.s2bg, [0, .45, .59, .8, 1], [.1, .28, .62, 1.12]);
+      drawBandedParallax(assets.s2bg, [0, .45, .59, .8, 1], [.1, .28, .62, 1]);
     } else {
-      drawBandedParallax(assets.s3bg, [0, .34, .46, .76, 1], [.08, .22, .55, 1.08]);
+      drawBandedParallax(assets.s3bg, [0, .34, .46, .76, 1], [.08, .22, .55, 1]);
     }
     const roadShade = ctx.createLinearGradient(0, GROUND_Y - 90, 0, H);
     roadShade.addColorStop(0, "#06132900");
@@ -823,6 +869,17 @@
     }
   }
 
+  function thiefJumpHeight(x, width) {
+    const contact = x + width * .5;
+    for (const obstacle of obstacles) {
+      if (!["gap", "manhole"].includes(obstacle.kind)) continue;
+      const {left, right} = terrainBounds(obstacle);
+      const progress = (contact - left + 110) / (right - left + 220);
+      if (progress > 0 && progress < 1) return Math.sin(progress * Math.PI) * 125;
+    }
+    return 0;
+  }
+
   function drawThief() {
     const row = thiefThrowTime > 0 ? 3 : boostTime > 0 ? 1 : 0;
     const column = Math.floor(worldDistance / 48) % 8;
@@ -831,13 +888,14 @@
       const retreat = Math.max(0, Math.min(55, ((chaseSpeed - BASE_SPEED) / (BOOST_SPEED - BASE_SPEED)) * 55));
       const width = 240;
       const height = Math.round(width / VEHICLE_FRAME_RATIO);
-      drawSheetFrame(assets.thiefVehicle, 8, 6, column, row, W - 300 - retreat, GROUND_Y - height, width, height);
+      const x = W - 300 - retreat;
+      drawSheetFrame(assets.thiefVehicle, 8, 6, column, row, x, GROUND_Y - height - thiefJumpHeight(x, width), width, height);
       return;
     }
     const width = 202;
     const height = Math.round(width / VEHICLE_FRAME_RATIO);
     const drawX = Math.max(W - 395, Math.min(W - 210, W - 275 + (BASE_SPEED - (boostTime > 0 ? 1180 : speed)) * .28));
-    drawSheetFrame(assets.thiefVehicle, 8, 6, column, row, drawX, GROUND_Y - height, width, height);
+    drawSheetFrame(assets.thiefVehicle, 8, 6, column, row, drawX, GROUND_Y - height - thiefJumpHeight(drawX, width), width, height);
   }
 
   function drawSheetFrame(image, columns, rows, column, row, x, y, width, height) {
@@ -847,8 +905,35 @@
     ctx.drawImage(image, column * sw, row * sh, sw, sh, x, y, width, height);
   }
 
+  function drawTerrain() {
+    for (const obstacle of obstacles) {
+      if (!obstacle.terrain) continue;
+      const image = assets[obstacle.key];
+      if (!image) continue;
+      if (obstacle.kind === "gap") {
+        const roadTop = H * (stageIndex === 2 ? .76 : .8);
+        const height = H - roadTop + 18;
+        const {left, right} = terrainBounds(obstacle);
+        // Remove the road and lane paint below the opening before adding the supplied cliff art.
+        ctx.fillStyle = "#020b18";
+        ctx.beginPath();
+        ctx.moveTo(left, roadTop);
+        ctx.lineTo(right, roadTop);
+        ctx.lineTo(obstacle.x + obstacle.w * .82, H);
+        ctx.lineTo(obstacle.x + obstacle.w * .18, H);
+        ctx.closePath();
+        ctx.fill();
+        ctx.drawImage(image, obstacle.x, roadTop - 18, obstacle.w, height);
+      } else {
+        const height = obstacle.kind === "manhole" ? 145 : 180;
+        ctx.drawImage(image, obstacle.x, GROUND_Y - height * .56, obstacle.w, height);
+      }
+    }
+  }
+
   function drawObstacles() {
     for (const obstacle of obstacles) {
+      if (obstacle.terrain) continue;
       const image = assets[obstacle.key];
       if (!image) continue;
       ctx.save();
@@ -875,7 +960,7 @@
   function drawSpeedReadout() {
     if (!["playing", "paused", "countdown"].includes(state)) return;
     const displayFactor = IS_MOBILE_PORTRAIT ? .25 : .22;
-    const kmh = Math.round((boostTime > 0 ? BOOST_SPEED : speed) * displayFactor);
+    const kmh = Math.round((boostTime > 0 ? BOOST_SPEED : speed * (surfaceKind === "mud" ? .52 : surfaceKind === "puddle" ? .72 : 1)) * displayFactor);
     const panel = IS_COMPACT_VIEW
       ? { x: 18, y: H - 58, width: 178, height: 37, textX: 31, textY: H - 32 }
       : { x: 18, y: H - 70, width: 218, height: 49, textX: 35, textY: H - 38 };
