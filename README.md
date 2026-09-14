@@ -14,3 +14,30 @@
 ## 실행
 
 별도 설치 없이 `dist/index.html`을 정적 웹 서버로 열면 실행됩니다. 배포할 때는 `dist` 폴더 전체를 사용합니다.
+
+## Cloudflare 배포
+
+Node.js 20 이상에서 의존성을 설치한 뒤 원하는 배포 방식을 실행합니다.
+
+```bash
+npm install
+
+# Workers Static Assets
+npm run deploy:workers
+
+# Cloudflare Pages
+npm run deploy:pages
+```
+
+### Workers Builds 설정
+
+- Build command: `npm run check`
+- Deploy command: `npm run deploy:workers`
+
+### Pages Git 연동 설정
+
+- Framework preset: `None`
+- Build command: 비워두기
+- Build output directory: `dist`
+
+`dist/_headers`는 Workers Static Assets와 Pages 양쪽에서 동일하게 적용됩니다.

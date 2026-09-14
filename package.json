@@ -1,0 +1,17 @@
+{
+  "name": "warehouse-heist",
+  "version": "1.1.0",
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "check": "node --check dist/game.js && WRANGLER_LOG_PATH=.wrangler/wrangler.log wrangler deploy --dry-run --outdir .wrangler/dry-run",
+    "dev": "wrangler dev",
+    "deploy:workers": "wrangler deploy",
+    "deploy:pages": "wrangler pages deploy dist --project-name warehouse-heist"
+  },
+  "devDependencies": {
+    "wrangler": "^4.131.1"
+  }
+}

@@ -1,3 +1,5 @@
 .DS_Store
 .sites-runtime/
+.wrangler/
+node_modules/
 game/resource/fonts/DOSSaemmul.ttf
