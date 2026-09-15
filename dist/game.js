@@ -16,7 +16,6 @@
     lives: document.querySelector("#lives"),
     stageProgress: document.querySelector("#stageProgress"),
     timeLeft: document.querySelector("#timeLeft"),
-    distanceLeft: document.querySelector("#distanceLeft"),
     productSlots: document.querySelector("#productSlots"),
     boostStatus: document.querySelector("#boostStatus"),
     boostGauge: document.querySelector("#boostGauge"),
@@ -53,8 +52,6 @@
   let H = 720;
   let GROUND_Y = 605;
   const STAGE_SECONDS = 30;
-  // Course markers follow the existing timed stage, independently of vehicle speed.
-  const STAGE_METERS = 300;
   const BOOST_CHARGE_SECONDS = 10;
   const BOOST_SECONDS = 3;
   const GRAVITY = 1940;
@@ -741,7 +738,6 @@
     ui.stageNumber.textContent = `STAGE ${stageIndex + 1}`;
     ui.stageName.textContent = stages[stageIndex].name;
     ui.stageProgress.style.width = `${Math.min(100, (stageElapsed / STAGE_SECONDS) * 100)}%`;
-    ui.distanceLeft.textContent = String(Math.max(0, Math.ceil(STAGE_METERS * (1 - stageElapsed / STAGE_SECONDS))));
     ui.timeLeft.textContent = String(Math.max(0, Math.ceil(STAGE_SECONDS - stageElapsed)));
     if (renderedLives !== lives) {
       renderedLives = lives;
@@ -791,6 +787,13 @@
   function drawBackground() {
     ctx.fillStyle = stages[stageIndex].palette;
     ctx.fillRect(0, 0, W, H);
+    const backdrop = backgroundLayout();
+    const sky = assets[stages[stageIndex].backgrounds[0]];
+    if (sky && backdrop.top > 0) {
+      ctx.drawImage(sky, 0, 0, sky.width, 1, 0, 0, W, Math.ceil(backdrop.top) + 1);
+      const roadBottom = Math.floor(backdrop.top + backdrop.height);
+      ctx.drawImage(sky, 0, sky.height - 1, sky.width, 1, 0, roadBottom - 1, W, H - roadBottom + 1);
+    }
     if (stageIndex === 0) {
       drawRepeating(assets.s1bg1, worldDistance * .1);
       drawRepeating(assets.s1bg2, worldDistance * .3);
@@ -808,24 +811,30 @@
     ctx.fillRect(0, GROUND_Y - 90, W, H - GROUND_Y + 90);
   }
 
+  function backgroundLayout() {
+    // Scale scenery around the road, independently of vehicles and collision geometry.
+    const height = IS_MOBILE_PORTRAIT ? Math.min(H, 900) : H;
+    return { height, top: GROUND_Y * (1 - height / H) };
+  }
+
   function drawRepeating(image, offset) {
     if (!image) return;
-    const drawHeight = H;
+    const { height: drawHeight, top } = backgroundLayout();
     const drawWidth = image.width * (drawHeight / image.height);
     const wrapped = ((offset % drawWidth) + drawWidth) % drawWidth;
-    for (let x = -wrapped; x < W + drawWidth; x += drawWidth) ctx.drawImage(image, x, 0, drawWidth, drawHeight);
+    for (let x = -wrapped; x < W + drawWidth; x += drawWidth) ctx.drawImage(image, x, top, drawWidth, drawHeight);
   }
 
   function drawBandedParallax(image, boundaries, speeds) {
     if (!image) return;
-    const drawHeight = H;
+    const { height: drawHeight, top } = backgroundLayout();
     const drawWidth = image.width * (drawHeight / image.height);
     for (let index = 0; index < speeds.length; index += 1) {
       const start = boundaries[index];
       const end = boundaries[index + 1];
       const sourceY = Math.round(image.height * start);
       const sourceHeight = Math.max(1, Math.round(image.height * end) - sourceY);
-      const destinationY = Math.round(drawHeight * start);
+      const destinationY = Math.round(top + drawHeight * start);
       const destinationHeight = Math.max(1, Math.round(drawHeight * end) - destinationY + 1);
       const offset = worldDistance * speeds[index];
       const wrapped = ((offset % drawWidth) + drawWidth) % drawWidth;

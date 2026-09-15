@@ -9,12 +9,12 @@ function extract(name) {
   return source.slice(start, end);
 }
 const node = () => ({style:{}, dataset:{}, children:[], classList:{toggle(){}}, replaceChildren(){this.children=[]}, append(n){this.children.push(n)}, setAttribute(){}});
-const ui = Object.fromEntries(['hud','stageNumber','stageName','stageProgress','distanceLeft','timeLeft','lives','boostGauge','boostLabel','boostStatus','boostButton'].map(id=>[id,node()]));
+const ui = Object.fromEntries(['hud','stageNumber','stageName','stageProgress','timeLeft','lives','boostGauge','boostLabel','boostStatus','boostButton'].map(id=>[id,node()]));
 const context = vm.createContext({assert, ui, document:{querySelector:node, createElement:node}, window:{devicePixelRatio:2}, ctx:{}, canvas:{getBoundingClientRect:()=>({width:390,height:540})}});
 vm.runInContext(`
 let IS_MOBILE_PORTRAIT=true, IS_COMPACT_VIEW=true, W=1280, H=720, GROUND_Y=605;
 const portraitQuery={matches:true}, compactQuery={matches:true};
-const VEHICLE_FRAME_RATIO=(1870/8)/(841/6), STAGE_SECONDS=30, STAGE_METERS=300;
+const VEHICLE_FRAME_RATIO=(1870/8)/(841/6), STAGE_SECONDS=30;
 let state='paused', stageIndex=0, stageElapsed=0, lives=3, renderedLives=-1, renderedGauge='';
 let boostReady=false, boostTime=0, safeTime=0;
 const stages=[{name:'도심 추격'}], paths={ui:''}, obstacles=[], effects=[];
@@ -22,6 +22,7 @@ ${extract('createPlayer')}
 ${extract('resizeGame')}
 ${extract('playerHitbox')}
 ${extract('updateHud')}
+${extract('backgroundLayout')}
 function togglePause(){state='paused'}
 let player=createPlayer();
 resizeGame();
@@ -43,10 +44,14 @@ portraitQuery.matches=true;
 resizeGame();
 assert.equal(player.w,180);
 assert.equal(player.y+player.h,GROUND_Y-120);
-for (const [elapsed,meters,seconds] of [[0,'300','30'],[15,'150','15'],[30,'0','0'],[31,'0','0']]) {
-  stageElapsed=elapsed;updateHud();assert.equal(ui.distanceLeft.textContent,meters);assert.equal(ui.timeLeft.textContent,seconds);
+const backdrop=backgroundLayout();
+assert.equal(backdrop.height,900);
+assert(Math.abs(backdrop.top + GROUND_Y * backdrop.height / H - GROUND_Y)<.001);
+IS_MOBILE_PORTRAIT=false;assert.equal(backgroundLayout().height,H);assert.equal(backgroundLayout().top,0);
+for (const [elapsed,seconds] of [[0,'30'],[15,'15'],[30,'0'],[31,'0']]) {
+  stageElapsed=elapsed;updateHud();assert.equal(ui.timeLeft.textContent,seconds);
 }
 state='playing';boostReady=true;updateHud();assert.equal(ui.boostButton.disabled,false);
 boostReady=false;updateHud();assert.equal(ui.boostButton.disabled,true);
 `,context);
-console.log('PASS: mobile camera, scaled hitbox, airborne rotation, obstacle alignment, course distance/time, boost state');
+console.log('PASS: mobile camera, scaled hitbox, airborne rotation, obstacle alignment, background scale/road anchor, remaining time, boost state');
