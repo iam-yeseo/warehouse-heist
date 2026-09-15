@@ -633,3 +633,17 @@ kbd { display: inline-block; min-width: 27px; padding: 3px 6px; border: 2px soli
   *, *::before, *::after { transition: none !important; }
   .recovered-product.is-visible { opacity: 1; transform: translate(-50%, 0) scale(1); }
 }
+
+/* Mobile title screen: centered content with the full image fitted to its width. */
+@media (max-width: 820px), (pointer: coarse) {
+  .intro-screen {
+    justify-content: center;
+    align-items: center;
+    background-color: var(--ink);
+    background-position: center;
+    background-size: 100% auto;
+  }
+  .intro-screen .screen-shade { background: linear-gradient(180deg, #04102b80, #04102bb3 50%, #04102b80); }
+  .intro-copy { width: 100%; margin: auto; padding: 24px 12px; text-align: center; }
+  .intro-copy .rules { justify-content: center; }
+}
