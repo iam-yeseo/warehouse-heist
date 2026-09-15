@@ -540,7 +540,7 @@ kbd { display: inline-block; min-width: 27px; padding: 3px 6px; border: 2px soli
   .action-button img { display: none; }
   .action-button span { position: static; display: block; transform: none; background: none; font-size: 18px; }
   .action-button:disabled { opacity: .65; filter: none; }
-  .action-button.is-ready { animation: none; border-color: var(--cyan); }
+  #boostButton.is-ready { animation: none; border-color: var(--cyan); background: var(--cyan); color: var(--ink); }
 }
 
 /* Keep course information above the road and thumb controls below it. */
@@ -616,7 +616,7 @@ kbd { display: inline-block; min-width: 27px; padding: 3px 6px; border: 2px soli
   .action-button:first-child, .action-button:last-child { transform: none; }
   .action-button:first-child:active, .action-button:last-child:active { transform: translateY(3px); }
   .action-button:disabled { opacity: .65; filter: none; }
-  .action-button.is-ready { animation: none; border-color: var(--cyan); }
+  #boostButton.is-ready { animation: none; border-color: var(--cyan); background: var(--cyan); color: var(--ink); }
   .notice { top: max(136px, calc(env(safe-area-inset-top) + 120px)); max-width: calc(100% - 24px); width: max-content; text-align: center; }
   .countdown { height: var(--road-height); }
   .intro-copy { padding: max(9svh, 40px) 12px 24px; }
