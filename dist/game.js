@@ -16,6 +16,7 @@
     lives: document.querySelector("#lives"),
     stageProgress: document.querySelector("#stageProgress"),
     timeLeft: document.querySelector("#timeLeft"),
+    distanceLeft: document.querySelector("#distanceLeft"),
     productSlots: document.querySelector("#productSlots"),
     boostStatus: document.querySelector("#boostStatus"),
     boostGauge: document.querySelector("#boostGauge"),
@@ -52,6 +53,8 @@
   let H = 720;
   let GROUND_Y = 605;
   const STAGE_SECONDS = 30;
+  // Course markers follow the existing timed stage, independently of vehicle speed.
+  const STAGE_METERS = 300;
   const BOOST_CHARGE_SECONDS = 10;
   const BOOST_SECONDS = 3;
   const GRAVITY = 1940;
@@ -267,7 +270,7 @@
   let renderedGauge = "";
 
   function createPlayer() {
-    const width = IS_MOBILE_PORTRAIT ? 230 : 226;
+    const width = IS_MOBILE_PORTRAIT ? 180 : 226;
     const height = Math.round(width / VEHICLE_FRAME_RATIO);
     return { x: IS_MOBILE_PORTRAIT ? 45 : 138, y: GROUND_Y - height, w: width, h: height, vy: 0, jumps: 0, hurt: 0, land: 0, fallTime: 0 };
   }
@@ -738,6 +741,7 @@
     ui.stageNumber.textContent = `STAGE ${stageIndex + 1}`;
     ui.stageName.textContent = stages[stageIndex].name;
     ui.stageProgress.style.width = `${Math.min(100, (stageElapsed / STAGE_SECONDS) * 100)}%`;
+    ui.distanceLeft.textContent = String(Math.max(0, Math.ceil(STAGE_METERS * (1 - stageElapsed / STAGE_SECONDS))));
     ui.timeLeft.textContent = String(Math.max(0, Math.ceil(STAGE_SECONDS - stageElapsed)));
     if (renderedLives !== lives) {
       renderedLives = lives;
@@ -864,7 +868,7 @@
     if (boostTime > 0) {
       const frame = (Math.floor((BOOST_SECONDS - boostTime) * 12) % 6) + 1;
       const shield = assets[`shield${frame}`];
-      const shieldSize = IS_MOBILE_PORTRAIT ? 250 : 220;
+      const shieldSize = IS_MOBILE_PORTRAIT ? player.w + 20 : 220;
       if (shield) ctx.drawImage(shield, player.x + player.w / 2 - shieldSize / 2, player.y + player.h / 2 - shieldSize / 2, shieldSize, shieldSize);
     }
   }
@@ -886,9 +890,9 @@
     if (IS_MOBILE_PORTRAIT) {
       const chaseSpeed = boostTime > 0 ? BOOST_SPEED : speed;
       const retreat = Math.max(0, Math.min(55, ((chaseSpeed - BASE_SPEED) / (BOOST_SPEED - BASE_SPEED)) * 55));
-      const width = 240;
+      const width = 180;
       const height = Math.round(width / VEHICLE_FRAME_RATIO);
-      const x = W - 300 - retreat;
+      const x = W - width - 60 - retreat;
       drawSheetFrame(assets.thiefVehicle, 8, 6, column, row, x, GROUND_Y - height - thiefJumpHeight(x, width), width, height);
       return;
     }
@@ -1045,11 +1049,14 @@
     IS_MOBILE_PORTRAIT = portraitQuery.matches;
     IS_COMPACT_VIEW = compactQuery.matches;
     const rect = canvas.getBoundingClientRect();
-    W = IS_MOBILE_PORTRAIT ? 720 : 1280;
+    W = IS_MOBILE_PORTRAIT ? 1080 : 1280;
     H = IS_MOBILE_PORTRAIT ? Math.round(W * rect.height / Math.max(1, rect.width)) : 720;
     GROUND_Y = H - 115;
     player.x = IS_MOBILE_PORTRAIT ? 45 : 138;
-    player.y += GROUND_Y - oldGround;
+    const oldPlayerHeight = player.h;
+    player.w = IS_MOBILE_PORTRAIT ? 180 : 226;
+    player.h = Math.round(player.w / VEHICLE_FRAME_RATIO);
+    player.y += GROUND_Y - oldGround + oldPlayerHeight - player.h;
     for (const obstacle of obstacles) {
       obstacle.x += player.x - oldPlayerX;
       obstacle.y += GROUND_Y - oldGround;
