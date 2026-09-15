@@ -18,7 +18,7 @@
     <meta name="twitter:card" content="summary_large_image" />
     <title>창고 탈환 작전</title>
     <link rel="preload" href="./assets/game/fonts/DOSGothic.woff2" as="font" type="font/woff2" crossorigin />
-    <link rel="stylesheet" href="./style.css?v=1.6.3" />
+    <link rel="stylesheet" href="./style.css?v=1.6.4" />
   </head>
   <body>
     <main class="game-app">
@@ -43,11 +43,14 @@
             <strong class="time-readout"><span class="time-label">남은 시간 </span><span id="timeLeft">30</span>초</strong>
           </div>
           <div class="hud-right">
+            <div class="mobile-speed" aria-label="현재 속도"><span>속도 <small>KM/H</small></span><strong id="mobileSpeed">0</strong></div>
             <div class="product-slots" id="productSlots" aria-label="회수한 제품"></div>
+<div class="hud-controls">
 <button class="icon-button pause-button" id="pauseButton" type="button" aria-label="일시정지">
           <img src="./assets/game/ui/items/button-pause.webp" alt="" />
         </button>
 <button class="icon-button sound-button" id="soundButton" type="button" aria-label="효과음 끄기" aria-pressed="false">소리 켬</button>
+            </div>
           </div>
         </header>
 
@@ -151,6 +154,6 @@
     </main>
     <script src="./analytics-config.js?v=1.6.0"></script>
     <script src="./analytics.js?v=1.6.0"></script>
-    <script src="./game.js?v=1.6.3"></script>
+    <script src="./game.js?v=1.6.4"></script>
   </body>
 </html>

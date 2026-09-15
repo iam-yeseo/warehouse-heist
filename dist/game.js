@@ -16,6 +16,7 @@
     lives: document.querySelector("#lives"),
     stageProgress: document.querySelector("#stageProgress"),
     timeLeft: document.querySelector("#timeLeft"),
+    mobileSpeed: document.querySelector("#mobileSpeed"),
     productSlots: document.querySelector("#productSlots"),
     boostStatus: document.querySelector("#boostStatus"),
     boostGauge: document.querySelector("#boostGauge"),
@@ -974,6 +975,8 @@
     if (!["playing", "paused", "countdown"].includes(state)) return;
     const displayFactor = IS_MOBILE_PORTRAIT ? .25 : .22;
     const kmh = Math.round((boostTime > 0 ? BOOST_SPEED : speed * (surfaceKind === "mud" ? .52 : surfaceKind === "puddle" ? .72 : 1)) * displayFactor);
+    ui.mobileSpeed.textContent = String(kmh);
+    if (IS_MOBILE_PORTRAIT) return;
     const panel = IS_COMPACT_VIEW
       ? { x: 18, y: H - 58, width: 178, height: 37, textX: 31, textY: H - 32 }
       : { x: 18, y: H - 70, width: 218, height: 49, textX: 35, textY: H - 38 };
