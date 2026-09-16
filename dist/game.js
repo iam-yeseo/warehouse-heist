@@ -28,10 +28,19 @@
     pauseScreen: document.querySelector("#pauseScreen"),
     gameOverScreen: document.querySelector("#gameOverScreen"),
     victoryScreen: document.querySelector("#victoryScreen"),
+    rewardScreen: document.querySelector("#rewardScreen"),
     startButton: document.querySelector("#startButton"),
     nextStageButton: document.querySelector("#nextStageButton"),
     retryButton: document.querySelector("#retryButton"),
     victoryRetryButton: document.querySelector("#victoryRetryButton"),
+    rewardButton: document.querySelector("#rewardButton"),
+    rewardCloseButton: document.querySelector("#rewardCloseButton"),
+    rewardCopyButton: document.querySelector("#rewardCopyButton"),
+    rewardSaveButton: document.querySelector("#rewardSaveButton"),
+    rewardShopButton: document.querySelector("#rewardShopButton"),
+    rewardStaff: document.querySelector("#rewardStaff"),
+    rewardCode: document.querySelector("#rewardCode"),
+    rewardStatus: document.querySelector("#rewardStatus"),
     pauseButton: document.querySelector("#pauseButton"),
     resumeButton: document.querySelector("#resumeButton"),
     restartButton: document.querySelector("#restartButton"),
@@ -63,14 +72,21 @@
   const SPEED_ACCELERATION = IS_MOBILE_PORTRAIT ? 40 : 46;
   const OBSTACLE_VISUAL_SCALE = IS_MOBILE_PORTRAIT ? 1.3 : 1.1;
   const VEHICLE_FRAME_RATIO = (1870 / 8) / (841 / 6);
-  const ASSET_VERSION = "1.6.0";
+  const ASSET_VERSION = "1.7.0";
   const paths = {
     root: "./assets/game/",
     ui: "./assets/game/ui/items/",
     effects: "./assets/game/effects/vfx/",
     recovery: "./assets/game/effects/recovery/",
     products: "./assets/game/product/",
+    rewards: "./assets/game/rewards/",
   };
+
+  const rewardGifts = [
+    { name: "케이블 정리 벨크로", image: "gift-cable-straps.webp" },
+    { name: "렌즈 클리닝 키트", image: "gift-cleaning-kit.webp" },
+    { name: "미니 장비 파우치", image: "gift-equipment-pouch.webp" },
+  ];
 
   const stages = [
     {
@@ -240,6 +256,243 @@
       container.append(link);
     }
   }
+
+  async function apiPost(path, payload) {
+    const response = await fetch(path, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const result = await response.json().catch(() => null);
+    if (!response.ok || result?.ok !== true) throw new Error(result?.message || "서버 연결을 확인해 주세요.");
+    return result;
+  }
+
+  function setRewardStatus(message, status = "") {
+    ui.rewardStatus.textContent = message;
+    if (status) ui.rewardStatus.dataset.state = status;
+    else delete ui.rewardStatus.dataset.state;
+  }
+
+  function resetRewardUi() {
+    rewardCodeValue = "";
+    ui.rewardCode.textContent = "코드 발급 대기";
+    ui.rewardCopyButton.disabled = true;
+    ui.rewardCopyButton.textContent = "복사하기";
+    ui.rewardSaveButton.disabled = true;
+    ui.rewardButton.disabled = false;
+    setRewardStatus("클리어 기록을 확인하고 있어요.");
+  }
+
+  function startRewardSession() {
+    resetRewardUi();
+    stageVerificationChain = Promise.resolve({ ok: true });
+    rewardSessionPromise = apiPost("/api/game-sessions", { clientVersion: ASSET_VERSION })
+      .then((session) => ({ ok: true, sessionId: session.sessionId, claimToken: session.claimToken }))
+      .catch((error) => {
+        console.warn("Reward session unavailable", error);
+        return { ok: false, error };
+      });
+  }
+
+  function queueStageVerification(stage, elapsedSeconds, hearts) {
+    stageVerificationChain = stageVerificationChain.then(async (previous) => {
+      if (!previous.ok) return previous;
+      const session = await rewardSessionPromise;
+      if (!session.ok) return session;
+      try {
+        const result = await apiPost(`/api/game-sessions/${session.sessionId}/stages`, {
+          claimToken: session.claimToken,
+          stage,
+          elapsedSeconds: Number(elapsedSeconds.toFixed(2)),
+          lives: hearts,
+        });
+        return { ok: true, result };
+      } catch (error) {
+        console.warn("Stage verification unavailable", error);
+        return { ok: false, error };
+      }
+    });
+  }
+
+  function loadRewardAssets() {
+    if (rewardAssetsPromise) return rewardAssetsPromise;
+    const images = [ui.rewardStaff, ...document.querySelectorAll("[data-reward-image]")];
+    rewardAssetsPromise = Promise.all(images.map(async (image) => {
+      if (!image.src) image.src = image.dataset.src;
+      if (!image.complete) await new Promise((resolve) => image.addEventListener("load", resolve, { once: true }));
+      try { await image.decode(); } catch {}
+      return image;
+    }));
+    return rewardAssetsPromise;
+  }
+
+  function closeRewardModal() {
+    ui.rewardScreen.classList.remove("is-visible");
+    ui.rewardScreen.setAttribute("aria-hidden", "true");
+    if (state === "victory") ui.rewardButton.focus();
+  }
+
+  async function issueRewardCode() {
+    if (rewardCodeValue) return;
+    ui.rewardButton.disabled = true;
+    ui.rewardCopyButton.disabled = true;
+    ui.rewardSaveButton.disabled = true;
+    ui.rewardCode.textContent = "발급 중...";
+    setRewardStatus("3개 스테이지 클리어 기록을 확인하고 있어요.");
+    try {
+      const verification = await stageVerificationChain;
+      if (!verification.ok) throw verification.error || new Error("클리어 기록을 확인할 수 없습니다.");
+      const session = await rewardSessionPromise;
+      if (!session.ok) throw session.error || new Error("게임 세션을 확인할 수 없습니다.");
+      const reward = await apiPost("/api/reward-codes", {
+        sessionId: session.sessionId,
+        claimToken: session.claimToken,
+      });
+      rewardCodeValue = reward.code;
+      ui.rewardCode.textContent = reward.code;
+      ui.rewardCopyButton.disabled = false;
+      ui.rewardSaveButton.disabled = false;
+      setRewardStatus(
+        reward.sheetSynced
+          ? "발급 완료! 코드를 복사하거나 이 화면을 저장해 주세요."
+          : "코드는 정상 발급되었습니다. 시트 기록은 자동으로 다시 시도됩니다.",
+        "success",
+      );
+      track("reward_code_issued", { sheet_synced: reward.sheetSynced, existing: reward.existing });
+    } catch (error) {
+      ui.rewardCode.textContent = "발급 실패";
+      setRewardStatus(`${error.message} 잠시 후 사은품 받기를 다시 눌러 주세요.`, "error");
+    } finally {
+      ui.rewardButton.disabled = false;
+    }
+  }
+
+  async function openRewardModal() {
+    ui.rewardScreen.classList.add("is-visible");
+    ui.rewardScreen.setAttribute("aria-hidden", "false");
+    ui.rewardCloseButton.focus();
+    await loadRewardAssets();
+    await issueRewardCode();
+  }
+
+  function drawContainedImage(context, image, x, y, width, height) {
+    const scale = Math.min(width / image.naturalWidth, height / image.naturalHeight);
+    const drawWidth = image.naturalWidth * scale;
+    const drawHeight = image.naturalHeight * scale;
+    context.drawImage(image, x + (width - drawWidth) / 2, y + (height - drawHeight) / 2, drawWidth, drawHeight);
+  }
+
+  function drawWrappedText(context, text, x, y, maxWidth, lineHeight) {
+    const words = String(text).trim().split(/\s+/);
+    let line = "";
+    let cursorY = y;
+    for (const word of words) {
+      const next = line ? `${line} ${word}` : word;
+      if (context.measureText(next).width > maxWidth && line) {
+        context.fillText(line, x, cursorY);
+        line = word;
+        cursorY += lineHeight;
+      } else {
+        line = next;
+      }
+    }
+    if (line) context.fillText(line, x, cursorY);
+    return cursorY;
+  }
+
+  async function saveRewardImage() {
+    if (!rewardCodeValue) return;
+    ui.rewardSaveButton.disabled = true;
+    const originalText = ui.rewardSaveButton.textContent;
+    ui.rewardSaveButton.textContent = "이미지 만드는 중...";
+    try {
+      await loadRewardAssets();
+      if (document.fonts?.ready) await document.fonts.ready;
+      const exportCanvas = document.createElement("canvas");
+      exportCanvas.width = 1200;
+      exportCanvas.height = 1500;
+      const exportContext = exportCanvas.getContext("2d");
+      exportContext.imageSmoothingEnabled = false;
+      exportContext.fillStyle = "#07152c";
+      exportContext.fillRect(0, 0, 1200, 1500);
+      exportContext.fillStyle = "#102b53";
+      exportContext.fillRect(54, 54, 1092, 1392);
+      exportContext.strokeStyle = "#f27490";
+      exportContext.lineWidth = 12;
+      exportContext.strokeRect(54, 54, 1092, 1392);
+
+      drawContainedImage(exportContext, ui.rewardStaff, 68, 85, 300, 360);
+      exportContext.textAlign = "left";
+      exportContext.fillStyle = "#25def1";
+      exportContext.font = '32px "DOSGothic", monospace';
+      exportContext.fillText("CLEAR REWARD", 390, 142);
+      exportContext.fillStyle = "#f7fbff";
+      exportContext.font = '64px "DOSGothic", monospace';
+      exportContext.fillText("사은품 혜택 받기", 390, 222);
+      exportContext.font = '30px "DOSGothic", monospace';
+      exportContext.fillStyle = "#dceafb";
+      drawWrappedText(exportContext, "도둑이 훔쳐간 물건을 전부 되찾게 도와주셔서 감사드려요!", 390, 282, 690, 42);
+      drawWrappedText(exportContext, "아래 3개 중 하나의 물품을 랜덤으로 선물해 드립니다.", 390, 370, 690, 42);
+
+      const giftImages = [...document.querySelectorAll("[data-reward-image]")];
+      giftImages.forEach((image, index) => {
+        const x = 82 + index * 354;
+        exportContext.fillStyle = "#07152c";
+        exportContext.fillRect(x, 500, 324, 330);
+        exportContext.strokeStyle = "#577da4";
+        exportContext.lineWidth = 5;
+        exportContext.strokeRect(x, 500, 324, 330);
+        drawContainedImage(exportContext, image, x + 28, 520, 268, 230);
+        exportContext.fillStyle = "#f7fbff";
+        exportContext.font = '28px "DOSGothic", monospace';
+        exportContext.textAlign = "center";
+        exportContext.fillText(rewardGifts[index].name, x + 162, 790);
+      });
+
+      exportContext.textAlign = "left";
+      exportContext.fillStyle = "#07152c";
+      exportContext.fillRect(82, 875, 1036, 150);
+      exportContext.fillStyle = "#dceafb";
+      exportContext.font = '25px "DOSGothic", monospace';
+      drawWrappedText(exportContext, "사은품은 위 상품 중 랜덤 지급되며, 상품 구매 후 칼라미디어 채널톡에 난수 코드 또는 지금 이 화면을 캡처해서 전달해주셔야 사은품 지급이 가능합니다.", 112, 920, 976, 38);
+
+      exportContext.fillStyle = "#25def1";
+      exportContext.font = '26px "DOSGothic", monospace';
+      exportContext.fillText("클리어 인증 코드", 82, 1092);
+      exportContext.fillStyle = "#020712";
+      exportContext.fillRect(82, 1122, 1036, 172);
+      exportContext.strokeStyle = "#ffd43d";
+      exportContext.lineWidth = 6;
+      exportContext.strokeRect(82, 1122, 1036, 172);
+      exportContext.fillStyle = "#ffd43d";
+      exportContext.font = '76px "DOSGothic", monospace';
+      exportContext.textAlign = "center";
+      exportContext.fillText(rewardCodeValue, 600, 1232);
+      exportContext.fillStyle = "#a9c0dc";
+      exportContext.font = '24px "DOSGothic", monospace';
+      exportContext.fillText("칼라미디어 채널톡에 이 이미지를 전달해 주세요.", 600, 1372);
+
+      const blob = await new Promise((resolve) => exportCanvas.toBlob(resolve, "image/png"));
+      if (!blob) throw new Error("이미지를 만들 수 없습니다.");
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `칼라미디어-사은품-${rewardCodeValue}.png`;
+      document.body.append(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1_000);
+      setRewardStatus("코드가 포함된 안내 이미지를 저장했습니다.", "success");
+      track("reward_card_save");
+    } catch (error) {
+      setRewardStatus(error.message || "이미지를 저장하지 못했습니다.", "error");
+    } finally {
+      ui.rewardSaveButton.textContent = originalText;
+      ui.rewardSaveButton.disabled = !rewardCodeValue;
+    }
+  }
+
   let state = "loading";
   let stageIndex = 0;
   let stageElapsed = 0;
@@ -257,6 +510,10 @@
   let noticeTimer = 0;
   let recoveryTimer = 0;
   let audioContext = null;
+  let rewardSessionPromise = Promise.resolve({ ok: false, error: new Error("게임을 시작해 주세요.") });
+  let stageVerificationChain = Promise.resolve({ ok: true });
+  let rewardCodeValue = "";
+  let rewardAssetsPromise = null;
   let selectedProducts = [];
   let recoveredProducts = [];
   let obstacles = [];
@@ -357,6 +614,8 @@
   function resetCampaign() {
     if (["loading", "stage-loading", "countdown"].includes(state)) return;
     campaignElapsed = 0;
+    closeRewardModal();
+    startRewardSession();
     track("game_start", {device: matchMedia("(pointer: coarse)").matches ? "touch" : "desktop", orientation: portraitQuery.matches ? "portrait" : "landscape"});
     ensureStage(1).then(() => ensureStage(2)).catch(() => {});
     stageIndex = 0;
@@ -369,9 +628,10 @@
   }
 
   function hideAllScreens() {
-    for (const screen of [ui.introScreen, ui.stageClearScreen, ui.pauseScreen, ui.gameOverScreen, ui.victoryScreen]) {
+    for (const screen of [ui.introScreen, ui.stageClearScreen, ui.pauseScreen, ui.gameOverScreen, ui.victoryScreen, ui.rewardScreen]) {
       screen.classList.remove("is-visible");
     }
+    ui.rewardScreen.setAttribute("aria-hidden", "true");
   }
 
   async function beginStage(index) {
@@ -647,6 +907,7 @@
     document.querySelector("#recoveredProductCopy").textContent = productCopy[productNumber];
     saveRecord();
     track("stage_clear", {stage:stageIndex + 1, time_left:Math.max(0, STAGE_SECONDS - stageElapsed), hearts:lives});
+    queueStageVerification(stageIndex + 1, stageElapsed, lives);
     ui.productLink.setAttribute("aria-label", `${product.name} 상품 페이지 새 창에서 열기`);
     ui.nextStageButton.textContent = stageIndex === 2 ? "탈환 결과 보기" : "다음 추격";
     ui.nextStageButton.disabled = true;
@@ -715,6 +976,7 @@
     track("game_complete", {total_seconds:Number(campaignElapsed.toFixed(2))});
     updateHud();
     ui.victoryScreen.classList.add("is-visible");
+    ui.rewardButton.disabled = false;
     ui.hud.style.opacity = "0";
     playWinJingle();
   }
@@ -1025,6 +1287,25 @@
   ui.nextStageButton.addEventListener("click", () => stageIndex === 2 ? showVictory() : beginStage(stageIndex + 1));
   ui.retryButton.addEventListener("click", resetCampaign);
   ui.victoryRetryButton.addEventListener("click", resetCampaign);
+  ui.rewardButton.addEventListener("click", openRewardModal);
+  ui.rewardCloseButton.addEventListener("click", closeRewardModal);
+  ui.rewardScreen.addEventListener("click", (event) => {
+    if (event.target === ui.rewardScreen) closeRewardModal();
+  });
+  ui.rewardCopyButton.addEventListener("click", async () => {
+    if (!rewardCodeValue) return;
+    try {
+      await navigator.clipboard.writeText(rewardCodeValue);
+      ui.rewardCopyButton.textContent = "복사 완료!";
+      setRewardStatus("난수 코드를 복사했습니다.", "success");
+      track("reward_code_copy");
+      setTimeout(() => { ui.rewardCopyButton.textContent = "복사하기"; }, 1_600);
+    } catch {
+      window.prompt("아래 코드를 복사해 주세요.", rewardCodeValue);
+    }
+  });
+  ui.rewardSaveButton.addEventListener("click", saveRewardImage);
+  ui.rewardShopButton.addEventListener("click", () => track("reward_shop_click"));
   ui.pauseButton.addEventListener("click", togglePause);
   ui.resumeButton.addEventListener("click", togglePause);
   ui.restartButton.addEventListener("click", resetCampaign);
@@ -1038,6 +1319,11 @@
 
   window.addEventListener("keydown", (event) => {
     if (event.target.closest?.("input, textarea, select, [contenteditable=true]")) return;
+    if (event.code === "Escape" && ui.rewardScreen.classList.contains("is-visible")) {
+      event.preventDefault();
+      closeRewardModal();
+      return;
+    }
     if (["Space", "Enter"].includes(event.code) && event.target.closest?.("button, a")) return;
     if (["Space", "ArrowUp", "KeyW"].includes(event.code) && state === "playing") {
       event.preventDefault();

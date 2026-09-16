@@ -14,6 +14,35 @@ const instrumented = source.replace('  window.requestAnimationFrame(loop);\n  pr
   };
   window.requestAnimationFrame(loop);
   preload();`);
+
+async function installRewardApiMock(page) {
+  let lastStage = 0;
+  const sessionId = '11111111-2222-4333-8444-555555555555';
+  const claimToken = 'test-claim-token';
+  await page.route('**/api/**', async route => {
+    const request = route.request();
+    const pathname = new URL(request.url()).pathname;
+    const body = request.postDataJSON?.() || {};
+    let response;
+    if (request.method() === 'POST' && pathname === '/api/game-sessions') {
+      lastStage=0;
+      response = {ok:true,sessionId,claimToken};
+    } else if (request.method() === 'POST' && /\/api\/game-sessions\/.+\/stages$/.test(pathname)) {
+      assert.equal(body.claimToken,claimToken);
+      assert.equal(body.stage,lastStage+1);
+      lastStage=body.stage;
+      response={ok:true,accepted:true,lastStage,completed:lastStage===3};
+    } else if (request.method() === 'POST' && pathname === '/api/reward-codes') {
+      assert.equal(lastStage,3);
+      assert.equal(body.sessionId,sessionId);
+      assert.equal(body.claimToken,claimToken);
+      response={ok:true,code:'2ABC-3DEF-4GHJ',parts:['2ABC','3DEF','4GHJ'],existing:false,sheetSynced:true};
+    } else {
+      return route.fulfill({status:404,contentType:'application/json',body:JSON.stringify({ok:false})});
+    }
+    return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(response)});
+  });
+}
 (async () => {
   const browser = await chromium.launch({channel:'chrome', headless:true});
   const errors = [];
@@ -24,11 +53,12 @@ const instrumented = source.replace('  window.requestAnimationFrame(loop);\n  pr
       const page = await context.newPage();
       page.on('pageerror', error => errors.push(error.message));
       page.on('response', response => {if(response.status()>=400) errors.push(`${response.status()} ${response.url()}`)});
+      await installRewardApiMock(page);
       await page.route('**/game.js?*', route => route.fulfill({contentType:'application/javascript',body:instrumented}));
       await page.goto(base);
       await page.locator('#introScreen.is-visible').waitFor();
       const initial = await page.evaluate(() => performance.getEntriesByType('resource').map(r=>({url:r.name,bytes:r.transferSize})));
-      assert(!initial.some(r=>/stage-[23]|product-\d/.test(r.url)), 'Later stages and products must be lazy');
+      assert(!initial.some(r=>/stage-[23]|product-\d|\/rewards\//.test(r.url)), 'Later stages, products, and rewards must be lazy');
       const bytes = initial.reduce((n,r)=>n+r.bytes,0);
       assert(bytes<5_000_000, `Initial transfer ${bytes} exceeds 5 MB`);
       await page.click('#startButton');
@@ -74,6 +104,21 @@ const instrumented = source.replace('  window.requestAnimationFrame(loop);\n  pr
       }
       await page.locator('#victoryScreen.is-visible').waitFor();
       assert.equal(await page.locator('#victoryProducts a').count(),3);
+      assert.equal(await page.locator('#rewardButton').isVisible(),true);
+      await page.click('#rewardButton');
+      await page.locator('#rewardScreen.is-visible').waitFor();
+      await page.waitForFunction(()=>document.querySelector('#rewardCode').textContent==='2ABC-3DEF-4GHJ');
+      assert.equal(await page.locator('.reward-gifts figure').count(),3);
+      assert.equal(await page.locator('#rewardCopyButton').isEnabled(),true);
+      assert.equal(await page.locator('#rewardSaveButton').isEnabled(),true);
+      if(width===1440) {
+        const [download]=await Promise.all([page.waitForEvent('download'),page.click('#rewardSaveButton')]);
+        assert.match(download.suggestedFilename(),/^칼라미디어-사은품-2ABC-3DEF-4GHJ\.png$/);
+        await download.saveAs('/tmp/heist-reward-card.png');
+        assert(fs.statSync('/tmp/heist-reward-card.png').size>100_000,'Saved reward card must contain rendered images and code');
+      }
+      await page.screenshot({path:`/tmp/heist-reward-${width}.png`,fullPage:true});
+      await page.click('#rewardCloseButton');
       await page.screenshot({path:`/tmp/heist-victory-${width}.png`});
       let events=await page.evaluate(()=>window.dataLayer.filter(e=>e.event).map(e=>e.event));
       assert.equal(events.filter(e=>e==='stage_clear').length,3);
@@ -98,13 +143,14 @@ const instrumented = source.replace('  window.requestAnimationFrame(loop);\n  pr
       await page.locator('#introScreen.is-visible').waitFor();
       assert((await page.locator('#recordSummary').textContent()).includes('탈환 성공'));
       assert.equal(await page.locator('#soundButton').getAttribute('aria-pressed'),'true');
-      report.push({width,height,initialBytes:bytes,checks:'start, jump, boost, rotation, 3 stages, links, events, victory, failures, persistence'});
+      report.push({width,height,initialBytes:bytes,checks:'start, jump, boost, rotation, 3 stages, links, events, victory, reward code modal, failures, persistence'});
       await context.close();
     }
     // Retry failed initial image and unavailable next-stage images; reduced motion and blocked storage.
     const page=await browser.newPage({reducedMotion:'reduce'});
     await page.addInitScript(()=>{Object.defineProperty(window,'localStorage',{get(){throw new Error('blocked')}})});
     let rejectHero=true, rejectStage=true;
+    await installRewardApiMock(page);
     await page.route('**/hero-vehicle.webp?*',route=>rejectHero?route.abort():route.continue());
     await page.route('**/stage-2/**',route=>rejectStage?route.abort():route.continue());
     await page.route('**/game.js?*',route=>route.fulfill({contentType:'application/javascript',body:instrumented}));

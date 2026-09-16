@@ -1,8 +1,24 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "warehouse-heist",
-  "compatibility_date": "2026-09-14",
+  "main": "./src/index.mjs",
+  "compatibility_date": "2026-09-16",
+  "compatibility_flags": ["nodejs_compat"],
   "assets": {
-    "directory": "./dist"
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*"]
+  },
+  "d1_databases": [
+    {
+      "binding": "REWARDS_DB",
+      "database_name": "warehouse-heist-rewards",
+      "database_id": "6748a287-a6f7-4bfa-9ada-399ce5880c18",
+      "migrations_dir": "./migrations"
+    }
+  ],
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
   }
 }

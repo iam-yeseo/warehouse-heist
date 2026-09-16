@@ -42,6 +42,29 @@ npm run deploy:pages
 
 `dist/_headers`는 Workers Static Assets와 Pages 양쪽에서 동일하게 적용됩니다.
 
+## 1.7.0 최종 클리어 사은품
+
+- 3개 스테이지를 모두 통과한 세션만 서버에서 사은품 코드를 발급합니다. 스테이지는 순서와 최소 플레이 시간을 확인하며, 브라우저에는 원본 인증 토큰 대신 일회성 세션 토큰만 전달합니다.
+- 코드는 혼동하기 쉬운 `0`, `1`, `O`, `I`, `L`을 제외한 숫자·영문 대문자 12자리를 `XXXX-XXXX-XXXX` 형식으로 표시합니다. 요청서의 표시 형식과 시트 열(`난수 1`~`난수 3`)을 기준으로 세 그룹을 사용합니다.
+- D1의 `reward_codes.code`와 `reward_codes.session_id`는 각각 고유합니다. 같은 클리어 세션에서 다시 요청하면 기존 코드를 돌려주며 새 코드를 중복 발급하지 않습니다.
+- 최종 결과의 분홍색 `사은품 받기` 버튼은 스태프·사은품 3종·주의사항·코드 복사·이미지 저장·칼라몰 이동 기능이 있는 안내창을 엽니다. 사은품 이미지는 안내창을 열 때만 내려받습니다.
+- 원본 8비트 리소스는 `game/resource/rewards`, 웹 최적화본은 `dist/assets/game/rewards`에 있습니다.
+
+### Google Sheets 기록 연동
+
+1. `integrations/google-apps-script/reward-code-webhook.gs`를 대상 시트에 연결된 Apps Script 프로젝트의 `Code.gs`로 저장합니다.
+2. 스크립트 속성 `WEBHOOK_SECRET`에 충분히 긴 임의 값을 설정합니다.
+3. 실행 사용자는 소유자, 접근 권한은 `모든 사용자`인 웹 앱으로 배포합니다.
+4. 같은 비밀 값과 배포 URL을 Worker Secret으로 저장합니다.
+
+```bash
+npx wrangler secret put SHEETS_WEBHOOK_SECRET
+npx wrangler secret put SHEETS_WEBHOOK_URL
+npx wrangler d1 migrations apply warehouse-heist-rewards --remote
+```
+
+웹훅은 `@OnlyCurrentDoc` 범위로 연결된 시트만 접근하고 대상 시트의 2행 헤더를 확인합니다. D1 순번을 기준으로 재시도 요청을 같은 행에 기록합니다. 코드 원본은 클라이언트가 아니라 D1에서 생성·보관하며 생성일과 생성시각은 한국 시간으로 나눠 기록합니다.
+
 
 ## 1.5.0 개선
 
@@ -65,9 +88,9 @@ GTM 사용 시 이 이벤트에 대한 맞춤 이벤트 트리거 및 GA4 이벤
 ## 검증
 
 - `node tests/mobile-state.cjs`: 모바일 시야·충돌 영역, 회전 시 공중 높이와 장애물 위치 유지, 배경 축소·노면 정렬, 남은 시간과 부스트 상태 확인.
-- `npm run check`: JavaScript 문법과 Cloudflare 정적 에셋 배포 사전 검사.
+- `npm run check`: 프런트엔드·Worker 문법, 10,000개 난수의 형식·금지문자·표본 중복, Cloudflare 배포 사전 검사를 확인합니다.
 - `node tests/game-browser.cjs`: 로컬 서버(기본 `http://localhost:4173`)와 Playwright 및 Chrome 필요. 기존 Playwright 경로는 `PLAYWRIGHT_MODULE`, 서버 주소는 `HEIST_TEST_URL`로 지정할 수 있습니다.
-- 브라우저 검증은 1440×900, 390×844, 844×390에서 시작/점프/부스트, 3개 스테이지, 상품 링크·이벤트, 종료 화면, 실패·재시작, 저장, 세로↔가로 회전, 로딩 실패 재시도 및 저장소 차단을 확인합니다. 테스트용 상태 제어는 네트워크 응답에만 삽입되며 배포 코드에 포함되지 않습니다.
+- 브라우저 검증은 1440×900, 390×844, 844×390에서 시작/점프/부스트, 3개 스테이지, 상품 링크·이벤트, 종료 화면, 사은품 코드 안내·이미지 저장, 실패·재시작, 저장, 세로↔가로 회전, 로딩 실패 재시도 및 저장소 차단을 확인합니다. 테스트용 상태 제어는 네트워크 응답에만 삽입되며 배포 코드에 포함되지 않습니다.
 - 실제 iOS/Android 기기, 카카오 공유 캐시 갱신 및 외부 분석 수집은 별도 확인이 필요합니다.
 
 ## 1.6.0 도로 지형

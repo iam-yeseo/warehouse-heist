@@ -18,7 +18,7 @@
     <meta name="twitter:card" content="summary_large_image" />
     <title>창고 탈환 작전</title>
     <link rel="preload" href="./assets/game/fonts/DOSGothic.woff2" as="font" type="font/woff2" crossorigin />
-    <link rel="stylesheet" href="./style.css?v=1.6.6" />
+    <link rel="stylesheet" href="./style.css?v=1.7.0" />
   </head>
   <body>
     <main class="game-app">
@@ -140,8 +140,57 @@
               <p>되찾은 촬영 장비를 만나보세요.</p>
             </div>
             <div class="product-cards" id="victoryProducts"></div>
-            <button class="pixel-button secondary" id="victoryRetryButton" type="button">다시 플레이</button>
+            <div class="victory-actions">
+              <button class="pixel-button secondary" id="victoryRetryButton" type="button">다시 플레이</button>
+              <button class="pixel-button reward-cta" id="rewardButton" type="button">사은품 받기</button>
+            </div>
             <button class="share-button" type="button">링크 공유</button>
+          </div>
+        </div>
+
+        <div class="screen reward-screen" id="rewardScreen" role="dialog" aria-modal="true" aria-labelledby="rewardTitle" aria-hidden="true">
+          <div class="modal-panel reward-panel">
+            <button class="reward-close" id="rewardCloseButton" type="button" aria-label="사은품 안내 닫기">×</button>
+            <div class="reward-intro">
+              <img id="rewardStaff" data-src="./assets/game/rewards/reward-staff.webp?v=1.7.0" alt="선물 상자를 든 칼라미디어 스태프" width="220" height="255" />
+              <div>
+                <p class="eyebrow">CLEAR REWARD</p>
+                <h2 id="rewardTitle">사은품 혜택 받기</h2>
+                <p>도둑이 훔쳐간 물건을 전부 되찾게 도와주셔서 감사드려요!</p>
+                <p>감사의 의미로 아래 3개 중 하나의 물품을 선물로 드리고 싶어요.</p>
+              </div>
+            </div>
+
+            <div class="reward-gifts" aria-label="랜덤 지급 사은품 3종">
+              <figure>
+                <img data-reward-image data-src="./assets/game/rewards/gift-cable-straps.webp?v=1.7.0" alt="케이블 정리 벨크로" width="180" height="180" />
+                <figcaption>케이블 정리 벨크로</figcaption>
+              </figure>
+              <figure>
+                <img data-reward-image data-src="./assets/game/rewards/gift-cleaning-kit.webp?v=1.7.0" alt="렌즈 클리닝 키트" width="180" height="180" />
+                <figcaption>렌즈 클리닝 키트</figcaption>
+              </figure>
+              <figure>
+                <img data-reward-image data-src="./assets/game/rewards/gift-equipment-pouch.webp?v=1.7.0" alt="미니 장비 파우치" width="180" height="180" />
+                <figcaption>미니 장비 파우치</figcaption>
+              </figure>
+            </div>
+
+            <p class="reward-notice">사은품은 위 상품 중 랜덤 지급되며, 상품 구매 후 칼라미디어 채널톡에 난수 코드 또는 지금 이 화면을 캡처해서 전달해주셔야 사은품 지급이 가능합니다.</p>
+
+            <div class="reward-code-box">
+              <span>클리어 인증 코드</span>
+              <div class="reward-code-row">
+                <output id="rewardCode" aria-live="polite">코드 발급 대기</output>
+                <button id="rewardCopyButton" type="button" disabled>복사하기</button>
+              </div>
+              <p id="rewardStatus" aria-live="polite">클리어 기록을 확인하고 있어요.</p>
+            </div>
+
+            <div class="reward-actions">
+              <button class="pixel-button secondary" id="rewardSaveButton" type="button" disabled>화면 이미지로 저장하기</button>
+              <a class="pixel-button reward-cta" id="rewardShopButton" href="https://www.callamedia.kr/?utm_source=heist&amp;utm_medium=game&amp;utm_campaign=warehouse&amp;utm_content=reward_shop" target="_blank" rel="noopener noreferrer">칼라몰 이동하기 ↗</a>
+            </div>
           </div>
         </div>
       </section>
@@ -154,6 +203,6 @@
     </main>
     <script src="./analytics-config.js?v=1.6.0"></script>
     <script src="./analytics.js?v=1.6.0"></script>
-    <script src="./game.js?v=1.6.4"></script>
+    <script src="./game.js?v=1.7.0"></script>
   </body>
 </html>
