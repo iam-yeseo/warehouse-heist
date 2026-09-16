@@ -72,7 +72,7 @@
   const SPEED_ACCELERATION = IS_MOBILE_PORTRAIT ? 40 : 46;
   const OBSTACLE_VISUAL_SCALE = IS_MOBILE_PORTRAIT ? 1.3 : 1.1;
   const VEHICLE_FRAME_RATIO = (1870 / 8) / (841 / 6);
-  const ASSET_VERSION = "1.7.0";
+  const ASSET_VERSION = "1.8.0";
   const paths = {
     root: "./assets/game/",
     ui: "./assets/game/ui/items/",
@@ -83,9 +83,9 @@
   };
 
   const rewardGifts = [
-    { name: "케이블 정리 벨크로", image: "gift-cable-straps.webp" },
-    { name: "렌즈 클리닝 키트", image: "gift-cleaning-kit.webp" },
-    { name: "미니 장비 파우치", image: "gift-equipment-pouch.webp" },
+    { name: "묶어바 케이블타이", image: "gift-cable-ties.webp" },
+    { name: "안전한 작업용 장갑", image: "gift-work-gloves.webp" },
+    { name: "카메라 뽀득뽀득 융", image: "gift-camera-cloth.webp" },
   ];
 
   const stages = [

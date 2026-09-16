@@ -109,6 +109,14 @@ async function installRewardApiMock(page) {
       await page.locator('#rewardScreen.is-visible').waitFor();
       await page.waitForFunction(()=>document.querySelector('#rewardCode').textContent==='2ABC-3DEF-4GHJ');
       assert.equal(await page.locator('.reward-gifts figure').count(),3);
+      assert.deepEqual(
+        await page.locator('.reward-gifts figcaption').allTextContents(),
+        ['묶어바 케이블타이','안전한 작업용 장갑','카메라 뽀득뽀득 융']
+      );
+      assert.deepEqual(
+        await page.locator('[data-reward-image]').evaluateAll(images=>images.map(image=>new URL(image.src).pathname.split('/').pop())),
+        ['gift-cable-ties.webp','gift-work-gloves.webp','gift-camera-cloth.webp']
+      );
       assert.equal(await page.locator('#rewardCopyButton').isEnabled(),true);
       assert.equal(await page.locator('#rewardSaveButton').isEnabled(),true);
       if(width===1440) {
