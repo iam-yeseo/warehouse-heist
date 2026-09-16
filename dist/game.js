@@ -72,7 +72,7 @@
   const SPEED_ACCELERATION = IS_MOBILE_PORTRAIT ? 40 : 46;
   const OBSTACLE_VISUAL_SCALE = IS_MOBILE_PORTRAIT ? 1.3 : 1.1;
   const VEHICLE_FRAME_RATIO = (1870 / 8) / (841 / 6);
-  const ASSET_VERSION = "1.8.0";
+  const ASSET_VERSION = "1.8.1";
   const paths = {
     root: "./assets/game/",
     ui: "./assets/game/ui/items/",
@@ -1393,7 +1393,7 @@
   for (const button of document.querySelectorAll(".share-button")) button.addEventListener("click", async () => {
     const url = "https://heist.yeseo.im/";
     try {
-      if (navigator.share) await navigator.share({title:"창고 탈환 작전", text:"도둑을 추격하고 상품 3개를 되찾으세요!", url});
+      if (navigator.share) await navigator.share({title:"칼라몰 창고 털이 작전", text:"도둑을 추격하고 상품 3개를 되찾으세요!", url});
       else { await navigator.clipboard.writeText(url); button.textContent = "링크 복사 완료!"; }
     } catch (error) {
       if (error.name !== "AbortError") { button.textContent = "주소를 복사해 주세요"; window.prompt("공유할 링크", url); }

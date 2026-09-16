@@ -8,21 +8,22 @@
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%2307152c'/%3E%3Cpath d='M9 27h31v22H9z' fill='white' stroke='%230a1830' stroke-width='4'/%3E%3Cpath d='M40 33h12l5 7v9H40z' fill='white' stroke='%230a1830' stroke-width='4'/%3E%3Cpath d='M10 42h46' stroke='%23f27490' stroke-width='4'/%3E%3Ccircle cx='21' cy='51' r='6' fill='%2329dff2' stroke='%230a1830' stroke-width='4'/%3E%3Ccircle cx='47' cy='51' r='6' fill='%2329dff2' stroke='%230a1830' stroke-width='4'/%3E%3C/svg%3E" />
     <meta property="og:type" content="website" />
     <meta property="og:locale" content="ko_KR" />
-    <meta property="og:title" content="창고 탈환 작전" />
+    <meta property="og:title" content="칼라몰 가을 맞이 프로모션 | 창고 털이 작전" />
     <meta property="og:description" content="점프하고 부스트! 도둑을 추격하고 촬영 장비 3개를 되찾으세요." />
     <meta property="og:url" content="https://heist.yeseo.im/" />
     <meta property="og:image" content="https://heist.yeseo.im/assets/share.jpg?v=1.6.0" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="창고 탈환 작전의 도심 추격" />
+    <meta property="og:image:alt" content="칼라몰 창고 털이 작전의 도심 추격" />
     <meta name="twitter:card" content="summary_large_image" />
-    <title>창고 탈환 작전</title>
+    <title>칼라몰 가을 맞이 프로모션 | 창고 털이 작전</title>
     <link rel="preload" href="./assets/game/fonts/DOSGothic.woff2" as="font" type="font/woff2" crossorigin />
-    <link rel="stylesheet" href="./style.css?v=1.8.0" />
+    <link rel="preload" href="./assets/game/branding/title.webp?v=1.8.1" as="image" type="image/webp" fetchpriority="high" />
+    <link rel="stylesheet" href="./style.css?v=1.8.1" />
   </head>
   <body>
     <main class="game-app">
-      <section class="game-frame" id="gameFrame" aria-label="창고 탈환 작전 게임">
+      <section class="game-frame" id="gameFrame" aria-label="창고 털이 작전 게임">
         <canvas id="game" width="1280" height="720" aria-label="점프와 부스트로 장애물을 피하며 도둑을 추격하는 게임"></canvas>
         <div class="scanlines" aria-hidden="true"></div>
 
@@ -76,15 +77,14 @@
         <div class="screen intro-screen" id="introScreen">
           <div class="screen-shade"></div>
           <div class="intro-copy">
-            <p class="eyebrow">WAREHOUSE HEIST</p>
-            <h1>창고 탈환<br /><em>작전</em></h1>
-            <p>도둑이 훔쳐 간 상품 3개를 되찾으세요.<br />세 개의 도로 끝에 하나씩 숨겨져 있습니다.</p>
+            <img class="intro-title" src="./assets/game/branding/title.webp?v=1.8.1" alt="칼라몰 가을 맞이 프로모션 창고 털이 작전" width="1153" height="433" decoding="async" fetchpriority="high" />
+            <p class="intro-description">도둑이 훔쳐 간 상품 3개를 되찾으세요.<br />세 개의 도로 끝에 하나씩 숨겨져 있습니다.</p>
             <p id="recordSummary" class="record-summary"></p>
             <div class="rules">
               <span><b>SPACE</b> 점프 · 더블점프</span>
               <span><b>B</b> 10초 무충돌 부스트</span>
             </div>
-            <button class="pixel-button primary" id="startButton" type="button">추격 시작</button>
+            <button class="pixel-button primary" id="startButton" type="button"><span>추격 시작</span></button>
           </div>
         </div>
 
@@ -152,7 +152,7 @@
           <div class="modal-panel reward-panel">
             <button class="reward-close" id="rewardCloseButton" type="button" aria-label="사은품 안내 닫기">×</button>
             <div class="reward-intro">
-              <img id="rewardStaff" data-src="./assets/game/rewards/reward-staff.webp?v=1.8.0" alt="선물 상자를 든 칼라미디어 스태프" width="220" height="255" />
+              <img id="rewardStaff" data-src="./assets/game/rewards/reward-staff.webp?v=1.8.1" alt="선물 상자를 든 칼라미디어 스태프" width="220" height="255" />
               <div>
                 <p class="eyebrow">CLEAR REWARD</p>
                 <h2 id="rewardTitle">사은품 혜택 받기</h2>
@@ -163,15 +163,15 @@
 
             <div class="reward-gifts" aria-label="랜덤 지급 사은품 3종">
               <figure>
-                <img data-reward-image data-src="./assets/game/rewards/gift-cable-ties.webp?v=1.8.0" alt="묶어바 케이블타이" width="180" height="180" />
+                <img data-reward-image data-src="./assets/game/rewards/gift-cable-ties.webp?v=1.8.1" alt="묶어바 케이블타이" width="180" height="180" />
                 <figcaption>묶어바 케이블타이</figcaption>
               </figure>
               <figure>
-                <img data-reward-image data-src="./assets/game/rewards/gift-work-gloves.webp?v=1.8.0" alt="안전한 작업용 장갑" width="180" height="180" />
+                <img data-reward-image data-src="./assets/game/rewards/gift-work-gloves.webp?v=1.8.1" alt="안전한 작업용 장갑" width="180" height="180" />
                 <figcaption>안전한 작업용 장갑</figcaption>
               </figure>
               <figure>
-                <img data-reward-image data-src="./assets/game/rewards/gift-camera-cloth.webp?v=1.8.0" alt="카메라 뽀득뽀득 융" width="180" height="180" />
+                <img data-reward-image data-src="./assets/game/rewards/gift-camera-cloth.webp?v=1.8.1" alt="카메라 뽀득뽀득 융" width="180" height="180" />
                 <figcaption>카메라 뽀득뽀득 융</figcaption>
               </figure>
             </div>
@@ -203,6 +203,6 @@
     </main>
     <script src="./analytics-config.js?v=1.6.0"></script>
     <script src="./analytics.js?v=1.6.0"></script>
-    <script src="./game.js?v=1.8.0"></script>
+    <script src="./game.js?v=1.8.1"></script>
   </body>
 </html>
