@@ -72,7 +72,7 @@
   const SPEED_ACCELERATION = IS_MOBILE_PORTRAIT ? 40 : 46;
   const OBSTACLE_VISUAL_SCALE = IS_MOBILE_PORTRAIT ? 1.3 : 1.1;
   const VEHICLE_FRAME_RATIO = (1870 / 8) / (841 / 6);
-  const ASSET_VERSION = "1.8.2";
+  const ASSET_VERSION = "1.8.3";
   const paths = {
     root: "./assets/game/",
     ui: "./assets/game/ui/items/",
@@ -454,8 +454,8 @@
       exportContext.fillStyle = "#07152c";
       exportContext.fillRect(82, 875, 1036, 150);
       exportContext.fillStyle = "#dceafb";
-      exportContext.font = '25px "DOSGothic", monospace';
-      drawWrappedText(exportContext, "사은품은 위 상품 중 랜덤 지급되며, 상품 구매 후 칼라미디어 채널톡에 난수 코드 또는 지금 이 화면을 캡처해서 전달해주셔야 사은품 지급이 가능합니다.", 112, 920, 976, 38);
+      exportContext.font = '27px "DOSGothic", monospace';
+      drawWrappedText(exportContext, "사은품은 위 상품 중 랜덤 지급되며, 상품 주문서 중 배송정보 - 요청사항에 아래 클리어 인증 코드를 기재해주시면 됩니다.", 112, 915, 976, 40);
 
       exportContext.fillStyle = "#25def1";
       exportContext.font = '26px "DOSGothic", monospace';
@@ -471,7 +471,7 @@
       exportContext.fillText(rewardCodeValue, 600, 1232);
       exportContext.fillStyle = "#a9c0dc";
       exportContext.font = '24px "DOSGothic", monospace';
-      exportContext.fillText("칼라미디어 채널톡에 이 이미지를 전달해 주세요.", 600, 1372);
+      exportContext.fillText("상품 주문서 배송정보 - 요청사항에 클리어 인증 코드를 기재해 주세요.", 600, 1372);
 
       const blob = await new Promise((resolve) => exportCanvas.toBlob(resolve, "image/png"));
       if (!blob) throw new Error("이미지를 만들 수 없습니다.");
@@ -1297,7 +1297,7 @@
     try {
       await navigator.clipboard.writeText(rewardCodeValue);
       ui.rewardCopyButton.textContent = "복사 완료!";
-      setRewardStatus("난수 코드를 복사했습니다.", "success");
+      setRewardStatus("클리어 인증 코드를 복사했습니다.", "success");
       track("reward_code_copy");
       setTimeout(() => { ui.rewardCopyButton.textContent = "복사하기"; }, 1_600);
     } catch {
