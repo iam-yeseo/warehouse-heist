@@ -4,6 +4,16 @@ const CLAIM_TOKEN_BYTES = 32;
 const MIN_STAGE_DURATION_MS = 25_000;
 const MIN_CLIENT_STAGE_SECONDS = 29;
 const MAX_REQUEST_BYTES = 8_192;
+const SESSION_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+const SESSION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+
+class RequestError extends Error {
+  constructor(message, status = 400, code = "bad_request") {
+    super(message);
+    this.status = status;
+    this.code = code;
+  }
+}
 
 const JSON_HEADERS = {
   "cache-control": "no-store",
@@ -28,10 +38,54 @@ function isTrustedOrigin(request) {
 
 async function readJson(request) {
   const contentLength = Number(request.headers.get("content-length") || 0);
-  if (contentLength > MAX_REQUEST_BYTES) throw new Error("요청이 너무 큽니다.");
+  if (contentLength > MAX_REQUEST_BYTES) throw new RequestError("요청이 너무 큽니다.", 413, "body_too_large");
   const contentType = request.headers.get("content-type") || "";
-  if (!contentType.toLowerCase().includes("application/json")) throw new Error("JSON 요청만 허용됩니다.");
-  return request.json();
+  if (contentType.split(";")[0].trim().toLowerCase() !== "application/json") {
+    throw new RequestError("JSON 요청만 허용됩니다.", 415, "unsupported_media_type");
+  }
+  if (!request.body) throw new RequestError("JSON 본문이 필요합니다.");
+  const reader = request.body.getReader();
+  const bytes = new Uint8Array(MAX_REQUEST_BYTES);
+  let size = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (size + value.byteLength > MAX_REQUEST_BYTES) {
+        await reader.cancel();
+        throw new RequestError("요청이 너무 큽니다.", 413, "body_too_large");
+      }
+      bytes.set(value, size);
+      size += value.byteLength;
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  let body;
+  try {
+    body = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes.subarray(0, size)));
+  } catch {
+    throw new RequestError("올바른 JSON 요청이 필요합니다.");
+  }
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    throw new RequestError("JSON 객체가 필요합니다.");
+  }
+  return body;
+}
+
+async function limitRequest(request, env, creatingSession) {
+  // CF-Connecting-IP is supplied by Cloudflare, never accept a body/X-Forwarded-For key.
+  const ip = request.headers.get("cf-connecting-ip") || "unknown";
+  const bindings = creatingSession ? [env.API_RATE_LIMITER, env.SESSION_RATE_LIMITER] : [env.API_RATE_LIMITER];
+  for (const binding of bindings) {
+    if (!binding) throw new RequestError("잠시 후 다시 시도해 주세요.", 503, "rate_limit_unavailable");
+    if (!(await binding.limit({ key: `warehouse-heist:${ip}` })).success) {
+      const response = apiError("요청이 많습니다. 1분 뒤 다시 시도해 주세요.", 429, "rate_limited");
+      response.headers.set("retry-after", "60");
+      return response;
+    }
+  }
+  return null;
 }
 
 function bytesToHex(bytes) {
@@ -102,11 +156,16 @@ async function createGameSession(env, body) {
 }
 
 async function getSession(env, sessionId, claimToken) {
-  if (typeof sessionId !== "string" || typeof claimToken !== "string") return null;
+  if (typeof sessionId !== "string" || !SESSION_ID.test(sessionId)
+    || typeof claimToken !== "string" || !/^[0-9a-f]{64}$/.test(claimToken)) return null;
   const claimTokenHash = await hashClaimToken(claimToken);
-  return env.REWARDS_DB.prepare(
+  const session = await env.REWARDS_DB.prepare(
     "SELECT id, created_at, last_stage, last_stage_at, completed_at FROM game_sessions WHERE id = ? AND claim_token_hash = ?",
   ).bind(sessionId, claimTokenHash).first();
+  if (session && !session.completed_at && Date.parse(session.created_at) <= Date.now() - SESSION_MAX_AGE_MS) {
+    throw new RequestError("게임 인증 시간이 만료되었습니다. 새 게임을 시작해 주세요.", 410, "session_expired");
+  }
+  return session;
 }
 
 async function recordStageClear(request, env, sessionId) {
@@ -130,21 +189,28 @@ async function recordStageClear(request, env, sessionId) {
     return apiError("클리어 시간이 너무 짧아 인증할 수 없습니다.", 409, "stage_time");
   }
 
-  const lives = Math.max(0, Math.min(3, Number(body.lives) || 0));
+  const lives = Number(body.lives);
+  if (!Number.isInteger(lives) || lives < 1 || lives > 3) return apiError("남은 생명이 올바르지 않습니다.");
   const clearedAt = new Date().toISOString();
   const completedAt = stage === 3 ? clearedAt : null;
   const statements = [
     env.REWARDS_DB.prepare(
-      "UPDATE game_sessions SET last_stage = ?, last_stage_at = ?, completed_at = COALESCE(?, completed_at) WHERE id = ? AND last_stage = ?",
-    ).bind(stage, clearedAt, completedAt, sessionId, Number(session.last_stage)),
+      "UPDATE game_sessions SET last_stage = ?, last_stage_at = ?, completed_at = COALESCE(?, completed_at) WHERE id = ? AND last_stage = ? AND created_at > ?",
+    ).bind(stage, clearedAt, completedAt, sessionId, Number(session.last_stage), new Date(Date.now() - SESSION_MAX_AGE_MS).toISOString()),
     env.REWARDS_DB.prepare(
-      "INSERT INTO game_stage_clears (session_id, stage, cleared_at, client_elapsed_seconds, lives_remaining) VALUES (?, ?, ?, ?, ?)",
+      "INSERT INTO game_stage_clears (session_id, stage, cleared_at, client_elapsed_seconds, lives_remaining) SELECT ?, ?, ?, ?, ? WHERE changes() = 1",
     ).bind(sessionId, stage, clearedAt, clientElapsed, lives),
   ];
 
   try {
     const [updateResult] = await env.REWARDS_DB.batch(statements);
-    if (Number(updateResult.meta?.changes || 0) !== 1) return apiError("스테이지 인증이 충돌했습니다. 다시 시도해 주세요.", 409, "stage_conflict");
+    if (Number(updateResult.meta?.changes || 0) !== 1) {
+      const refreshed = await getSession(env, sessionId, body.claimToken);
+      if (refreshed && Number(refreshed.last_stage) >= stage) {
+        return json({ ok: true, accepted: true, lastStage: Number(refreshed.last_stage), completed: Number(refreshed.last_stage) === 3 });
+      }
+      return apiError("스테이지 인증이 충돌했습니다. 다시 시도해 주세요.", 409, "stage_conflict");
+    }
   } catch (error) {
     const refreshed = await getSession(env, sessionId, body.claimToken);
     if (refreshed && Number(refreshed.last_stage) >= stage) {
@@ -157,20 +223,18 @@ async function recordStageClear(request, env, sessionId) {
   return json({ ok: true, accepted: true, lastStage: stage, completed: stage === 3 });
 }
 
-async function updateSheetSyncState(env, id, status, errorMessage = null) {
-  await env.REWARDS_DB.prepare(
-    "UPDATE reward_codes SET sheet_sync_status = ?, sheet_sync_attempts = sheet_sync_attempts + 1, sheet_synced_at = CASE WHEN ? = 'synced' THEN ? ELSE sheet_synced_at END, sheet_sync_error = ? WHERE id = ?",
-  ).bind(status, status, new Date().toISOString(), errorMessage?.slice(0, 500) || null, id).run();
-}
-
+// Cron is the only Sheets sender: user retries cannot fan out webhook requests.
 async function syncRewardToSheet(env, reward) {
-  if (!env.SHEETS_WEBHOOK_URL || !env.SHEETS_WEBHOOK_SECRET) {
-    await updateSheetSyncState(env, reward.id, "pending", "Google Sheets webhook is not configured");
-    return false;
-  }
+  const leaseToken = crypto.randomUUID();
+  const now = new Date();
+  const leaseUntil = new Date(now.getTime() + 120_000).toISOString();
+  const claim = await env.REWARDS_DB.prepare(
+    "UPDATE reward_codes SET sheet_sync_lease_token = ?, sheet_sync_lease_until = ?, sheet_sync_attempts = sheet_sync_attempts + 1 WHERE id = ? AND sheet_sync_status = 'pending' AND sheet_next_attempt_at <= ? AND (sheet_sync_lease_until IS NULL OR sheet_sync_lease_until <= ?)",
+  ).bind(leaseToken, leaseUntil, reward.id, now.toISOString(), now.toISOString()).run();
+  if (Number(claim.meta?.changes) !== 1) return;
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 8_000);
+  let synced = false;
+  let failure = null;
   try {
     const response = await fetch(env.SHEETS_WEBHOOK_URL, {
       method: "POST",
@@ -187,18 +251,41 @@ async function syncRewardToSheet(env, reward) {
           valid: reward.valid === 1 ? "정상" : "비정상",
         },
       }),
-      signal: controller.signal,
+      signal: AbortSignal.timeout(8_000),
     });
-    const result = await response.json().catch(() => null);
-    if (!response.ok || result?.ok !== true) throw new Error(result?.message || `Sheets webhook returned ${response.status}`);
-    await updateSheetSyncState(env, reward.id, "synced");
-    return true;
-  } catch (error) {
-    console.error(JSON.stringify({ event: "sheet_sync_failed", rewardId: reward.id, message: error.message }));
-    await updateSheetSyncState(env, reward.id, "pending", error.message);
-    return false;
-  } finally {
-    clearTimeout(timeout);
+    const result = await response.json();
+    if (!response.ok || result?.ok !== true) throw new Error("webhook_rejected");
+    synced = true;
+  } catch {
+    // Never persist a third-party response that might echo the shared secret.
+    failure = "webhook_failed";
+    console.warn(JSON.stringify({ event: "sheet_sync_failed", rewardId: reward.id }));
+  }
+  const backoffMs = Math.min(3_600_000, 60_000 * 2 ** Math.min(Number(reward.sheet_sync_attempts || 0), 6));
+  await env.REWARDS_DB.prepare(
+    "UPDATE reward_codes SET sheet_sync_status = ?, sheet_synced_at = CASE WHEN ? = 'synced' THEN ? ELSE sheet_synced_at END, sheet_sync_error = ?, sheet_next_attempt_at = ?, sheet_sync_lease_token = NULL, sheet_sync_lease_until = NULL WHERE id = ? AND sheet_sync_lease_token = ?",
+  ).bind(synced ? "synced" : "pending", synced ? "synced" : "pending", new Date().toISOString(), failure,
+    new Date(Date.now() + backoffMs).toISOString(), reward.id, leaseToken).run();
+}
+
+export async function runMaintenance(env, scheduledTime = Date.now()) {
+  if (env.SHEETS_WEBHOOK_URL && env.SHEETS_WEBHOOK_SECRET) {
+    const now = new Date().toISOString();
+    const { results } = await env.REWARDS_DB.prepare(
+      "SELECT id, part1, part2, part3, created_date, created_time, valid, sheet_sync_attempts FROM reward_codes WHERE sheet_sync_status = 'pending' AND sheet_next_attempt_at <= ? AND (sheet_sync_lease_until IS NULL OR sheet_sync_lease_until <= ?) ORDER BY sheet_next_attempt_at, id LIMIT 10",
+    ).bind(now, now).all();
+    // Sequential delivery respects the receiver's script-wide lock; <=31 D1 queries.
+    for (const reward of results) await syncRewardToSheet(env, reward);
+  } else {
+    console.warn(JSON.stringify({ event: "sheet_sync_not_configured" }));
+  }
+  if (new Date(scheduledTime).getUTCMinutes() === 0) {
+    // Only abandoned, uncompleted sessions; retain all completed/reward-bearing rows.
+    const cutoff = new Date(Date.now() - 7 * SESSION_MAX_AGE_MS).toISOString();
+    const result = await env.REWARDS_DB.prepare(
+      "DELETE FROM game_sessions WHERE id IN (SELECT id FROM game_sessions WHERE completed_at IS NULL AND created_at < ? AND NOT EXISTS (SELECT 1 FROM reward_codes WHERE session_id = game_sessions.id) ORDER BY created_at LIMIT 100)",
+    ).bind(cutoff).run();
+    console.log(JSON.stringify({ event: "abandoned_sessions_cleaned", count: result.meta?.changes || 0 }));
   }
 }
 
@@ -253,7 +340,7 @@ async function issueRewardCode(request, env) {
     reward = await createReward(env, session.id);
     existing = false;
   }
-  const sheetSynced = reward.sheet_sync_status === "synced" || await syncRewardToSheet(env, reward);
+  const sheetSynced = reward.sheet_sync_status === "synced";
   return json({
     ok: true,
     code: reward.code,
@@ -271,6 +358,10 @@ async function handleApi(request, env) {
   if (request.method === "GET" && url.pathname === "/api/health") {
     return json({ ok: true, sheetSyncConfigured: Boolean(env.SHEETS_WEBHOOK_URL && env.SHEETS_WEBHOOK_SECRET) });
   }
+  if (request.method === "POST") {
+    const limited = await limitRequest(request, env, url.pathname === "/api/game-sessions");
+    if (limited) return limited;
+  }
   if (request.method === "POST" && url.pathname === "/api/game-sessions") {
     return createGameSession(env, await readJson(request));
   }
@@ -281,12 +372,16 @@ async function handleApi(request, env) {
 }
 
 export default {
+  async scheduled(controller, env) {
+    await runMaintenance(env, controller.scheduledTime);
+  },
   async fetch(request, env) {
     try {
       const url = new URL(request.url);
       if (url.pathname.startsWith("/api/")) return await handleApi(request, env);
       return env.ASSETS.fetch(request);
     } catch (error) {
+      if (error instanceof RequestError) return apiError(error.message, error.status, error.code);
       console.error(JSON.stringify({ event: "request_failed", message: error.message, stack: error.stack }));
       return apiError("요청을 처리하지 못했습니다.", 500, "internal_error");
     }

@@ -3,16 +3,19 @@
   "version": "1.8.3",
   "private": true,
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "scripts": {
-    "check": "node --check dist/game.js && node --check src/index.mjs && node tests/reward-code.cjs && WRANGLER_LOG_PATH=.wrangler/wrangler.log wrangler deploy --dry-run --outdir .wrangler/dry-run",
+    "check": "node --check dist/game.js && node --check src/index.mjs && node tests/reward-code.cjs && node tests/api-security.cjs && node tests/mobile-state.cjs && WRANGLER_LOG_PATH=.wrangler/wrangler.log wrangler deploy --dry-run --outdir .wrangler/dry-run",
     "test:reward": "node tests/reward-code.cjs",
     "dev": "wrangler dev",
-    "deploy:workers": "wrangler deploy",
-    "deploy:pages": "wrangler pages deploy dist --project-name warehouse-heist"
+    "deploy:workers": "wrangler d1 migrations apply warehouse-heist-rewards --remote && wrangler deploy",
+    "deploy:pages": "wrangler pages deploy dist --project-name warehouse-heist",
+    "test:security": "node tests/api-security.cjs"
   },
   "devDependencies": {
+    "miniflare": "5.20260911.0-alpha",
+    "playwright": "1.63.0",
     "wrangler": "^4.131.1"
   }
 }

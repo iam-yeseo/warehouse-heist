@@ -318,12 +318,22 @@
   function loadRewardAssets() {
     if (rewardAssetsPromise) return rewardAssetsPromise;
     const images = [ui.rewardStaff, ...document.querySelectorAll("[data-reward-image]")];
-    rewardAssetsPromise = Promise.all(images.map(async (image) => {
-      if (!image.src) image.src = image.dataset.src;
-      if (!image.complete) await new Promise((resolve) => image.addEventListener("load", resolve, { once: true }));
-      try { await image.decode(); } catch {}
-      return image;
-    }));
+    rewardAssetsPromise = Promise.all(images.map((image) => new Promise((resolve) => {
+      const finish = () => {
+        clearTimeout(timer);
+        image.removeEventListener("load", finish);
+        image.removeEventListener("error", finish);
+        resolve(image);
+      };
+      const timer = setTimeout(finish, 5_000);
+      image.addEventListener("load", finish, { once: true });
+      image.addEventListener("error", finish, { once: true });
+      if (!image.src || (image.complete && !image.naturalWidth)) image.src = image.dataset.src;
+      if (image.complete) finish();
+    }))).then((loaded) => {
+      if (loaded.some((image) => !image.naturalWidth)) rewardAssetsPromise = null;
+      return loaded;
+    });
     return rewardAssetsPromise;
   }
 
@@ -372,11 +382,12 @@
     ui.rewardScreen.classList.add("is-visible");
     ui.rewardScreen.setAttribute("aria-hidden", "false");
     ui.rewardCloseButton.focus();
-    await loadRewardAssets();
+    void loadRewardAssets();
     await issueRewardCode();
   }
 
   function drawContainedImage(context, image, x, y, width, height) {
+    if (!image.complete || !image.naturalWidth || !image.naturalHeight) return;
     const scale = Math.min(width / image.naturalWidth, height / image.naturalHeight);
     const drawWidth = image.naturalWidth * scale;
     const drawHeight = image.naturalHeight * scale;

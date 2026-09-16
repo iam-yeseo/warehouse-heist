@@ -17,15 +17,15 @@
 
 ## Cloudflare 배포
 
-Node.js 20 이상에서 의존성을 설치한 뒤 원하는 배포 방식을 실행합니다.
+Node.js 22 이상에서 의존성을 설치한 뒤 원하는 배포 방식을 실행합니다.
 
 ```bash
-npm install
+npm ci
 
 # Workers Static Assets
 npm run deploy:workers
 
-# Cloudflare Pages
+# Cloudflare Pages (게임 화면만 제공, 사은품 API 미포함)
 npm run deploy:pages
 ```
 
@@ -44,7 +44,7 @@ npm run deploy:pages
 
 ## 1.8.0 최종 클리어 사은품
 
-- 3개 스테이지를 모두 통과한 세션만 서버에서 사은품 코드를 발급합니다. 스테이지는 순서와 최소 플레이 시간을 확인하며, 브라우저에는 원본 인증 토큰 대신 일회성 세션 토큰만 전달합니다.
+- 3개 스테이지를 모두 통과한 세션만 서버에서 사은품 코드를 발급합니다. 스테이지는 순서와 최소 플레이 시간을 확인하며, 브라우저에는 세션별 임의 인증 토큰을 전달하고 D1에는 해시만 저장합니다. 미완료 세션은 24시간 뒤 만료되며 완료 세션은 기존 코드 재조회에 사용할 수 있습니다. 시간 검증은 실제 플레이 증명이 아니므로 주문별 사은품 중복 지급은 운영 단계에서 확인해야 합니다.
 - 코드는 혼동하기 쉬운 `0`, `1`, `O`, `I`, `L`을 제외한 숫자·영문 대문자 12자리를 `XXXX-XXXX-XXXX` 형식으로 표시합니다. 요청서의 표시 형식과 시트 열(`난수 1`~`난수 3`)을 기준으로 세 그룹을 사용합니다.
 - D1의 `reward_codes.code`와 `reward_codes.session_id`는 각각 고유합니다. 같은 클리어 세션에서 다시 요청하면 기존 코드를 돌려주며 새 코드를 중복 발급하지 않습니다.
 - 최종 결과의 분홍색 `사은품 받기` 버튼은 스태프·사은품 3종(묶어바 케이블타이, 안전한 작업용 장갑, 카메라 뽀득뽀득 융)·주의사항·코드 복사·이미지 저장·칼라몰 이동 기능이 있는 안내창을 엽니다. 사은품 이미지는 안내창을 열 때만 내려받습니다.
@@ -63,7 +63,7 @@ npx wrangler secret put SHEETS_WEBHOOK_URL
 npx wrangler d1 migrations apply warehouse-heist-rewards --remote
 ```
 
-웹훅은 `@OnlyCurrentDoc` 범위로 연결된 시트만 접근하고 대상 시트의 2행 헤더를 확인합니다. D1 순번을 기준으로 재시도 요청을 같은 행에 기록합니다. 코드 원본은 클라이언트가 아니라 D1에서 생성·보관하며 생성일과 생성시각은 한국 시간으로 나눠 기록합니다.
+웹훅은 `@OnlyCurrentDoc` 범위로 연결된 시트만 접근하고 대상 시트의 2행 헤더를 확인합니다. D1 순번을 기준으로 재시도 요청을 같은 행에 기록합니다. Worker는 코드를 먼저 반환하고 매분 Cron에서 최대 10건씩 순차 동기화합니다. 실패 시 1분부터 최대 1시간까지 재시도 간격을 늘리며 lease로 중복 동기화를 줄입니다. 코드 원본은 클라이언트가 아니라 D1에서 생성·보관하며 생성일과 생성시각은 한국 시간으로 나눠 기록합니다.
 
 
 ## 1.5.0 개선
@@ -79,7 +79,7 @@ npx wrangler d1 migrations apply warehouse-heist-rewards --remote
 
 ## 분석 연결
 
-`dist/analytics-config.js`에 실제 `measurementId`(GA4) 또는 `containerId`(GTM)를 입력합니다. 두 값이 있으면 GTM을 우선합니다. 현재는 계정 ID가 없어 외부 분석 서버로 전송하지 않으며 `window.dataLayer`에 이벤트만 쌓입니다.
+`dist/analytics-config.js`에 실제 `measurementId`(GA4) 또는 `containerId`(GTM)를 입력합니다. 두 값이 있으면 GTM을 우선합니다. GA4/GTM은 현재 ID가 없어 `window.dataLayer`에 이벤트만 쌓입니다. 별도로 Microsoft Clarity 프로젝트 `yj7fm715n8`이 `<head>`에 연결되어 있으며 사은품 코드 영역은 명시적으로 마스킹합니다.
 
 이벤트: `game_load`(loading_ms), `game_start`(device, orientation), `stage_clear`(stage, time_left, hearts), `game_over`(stage, recovered_count), `game_complete`(total_seconds), `product_click`(product_id, stage, placement), `shop_click`(stage, recovered_count).
 
@@ -108,3 +108,14 @@ GTM 사용 시 이 이벤트에 대한 맞춤 이벤트 트리거 및 GA4 이벤
 - 세로 화면의 도로 시야를 720에서 1080 논리 픽셀로 넓히고 두 차량을 180px로 줄입니다. 회전할 때 차량 크기와 충돌 영역을 함께 갱신하고 지면 기준 높이를 유지합니다.
 
 - 모바일 배경은 높이 900 논리 픽셀 이내로 축소하고 도로를 기준으로 정렬합니다. 위쪽 하늘은 배경 상단 색으로 이어 채우며, 차량 크기와 충돌 판정은 유지합니다.
+
+## 출시 운영 보완
+
+- `npm run deploy:workers`는 D1 마이그레이션을 적용한 뒤 배포합니다. Workers Builds도 이 명령을 사용하고 D1 편집 권한이 있는 배포 인증을 유지하세요.
+- IP당 세션 생성 분당 10회, 전체 POST API 분당 60회 제한. 제한 바인딩이 없으면 503으로 쓰기를 거절합니다. Cloudflare 위치별 근사 제한이며 분산 봇 방어·1인 1회 지급의 증명은 아닙니다.
+- 실제 본문 8 KiB 제한, JSON 객체·UUID·64자리 토큰 검사. 오류는 400/413/415로 반환합니다.
+- 미완료 세션은 24시간 후 인증 만료, 7일 지난 미완료 세션만 매시 최대 100개 정리합니다. 완료·보상 기록은 보존합니다.
+- 보안 헤더의 Clarity inline script 해시는 `<head>`의 해당 스크립트를 변경하면 갱신해야 합니다. GTM Custom HTML 같은 추가 태그에는 CSP 검토가 필요합니다.
+- `npm run test:security`: 실제 로컬 D1을 이용한 요청·인증·동시성·재시도 검증.
+- `node tests/reward-resilience.cjs`: `npm run dev -- --port 4173` 실행 후 Chrome에서 이미지 실패·코드 저장·CSP·Clarity 호환성 검증. 외부 Clarity 스크립트는 테스트에서 대체합니다.
+- 운영 확인 방법과 사람이 처리할 항목: [출시 운영 가이드](docs/launch-operations.md).
