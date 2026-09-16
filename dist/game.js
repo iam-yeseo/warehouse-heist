@@ -72,7 +72,7 @@
   const SPEED_ACCELERATION = IS_MOBILE_PORTRAIT ? 40 : 46;
   const OBSTACLE_VISUAL_SCALE = IS_MOBILE_PORTRAIT ? 1.3 : 1.1;
   const VEHICLE_FRAME_RATIO = (1870 / 8) / (841 / 6);
-  const ASSET_VERSION = "1.8.1";
+  const ASSET_VERSION = "1.8.2";
   const paths = {
     root: "./assets/game/",
     ui: "./assets/game/ui/items/",

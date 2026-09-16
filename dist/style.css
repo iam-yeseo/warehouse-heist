@@ -745,7 +745,8 @@ kbd { display: inline-block; min-width: 27px; padding: 3px 6px; border: 2px soli
 }
 .intro-title {
   display: block;
-  width: min(760px, 88%);
+  width: clamp(240px, 52vw, 760px);
+  max-width: 88%;
   height: auto;
   margin: 0 auto 14px;
   image-rendering: pixelated;
@@ -807,7 +808,6 @@ kbd { display: inline-block; min-width: 27px; padding: 3px 6px; border: 2px soli
     padding: 24px 14px;
   }
   .intro-title {
-    width: min(94vw, 620px);
     margin-bottom: 10px;
   }
   .intro-copy > .intro-description {
@@ -822,7 +822,8 @@ kbd { display: inline-block; min-width: 27px; padding: 3px 6px; border: 2px soli
     padding: 12px;
   }
   .intro-title {
-    width: min(470px, 62%);
+    width: clamp(240px, 52vw, 470px);
+    max-width: 62%;
     margin-bottom: 4px;
   }
   .intro-copy > .intro-description {
