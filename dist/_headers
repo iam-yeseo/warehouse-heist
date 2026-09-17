@@ -1,6 +1,5 @@
 /*
   X-Content-Type-Options: nosniff
-  X-Frame-Options: DENY
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=()
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'sha256-HzkRk2Q433XSwm1Bq2NXRksUpGGY1LhNPandZOHVfH0=' https://*.clarity.ms https://www.googletagmanager.com; connect-src 'self' https://*.clarity.ms https://c.bing.com https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com; img-src 'self' data: blob: https://*.clarity.ms https://c.bing.com https://*.google-analytics.com https://www.googletagmanager.com; style-src 'self' 'unsafe-inline'; font-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'sha256-HzkRk2Q433XSwm1Bq2NXRksUpGGY1LhNPandZOHVfH0=' https://*.clarity.ms https://www.googletagmanager.com; connect-src 'self' https://*.clarity.ms https://c.bing.com https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com; img-src 'self' data: blob: https://*.clarity.ms https://c.bing.com https://*.google-analytics.com https://www.googletagmanager.com; style-src 'self' 'unsafe-inline'; font-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'self' https://callamedia.kr https://www.callamedia.kr; form-action 'none'
